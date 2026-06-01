@@ -53,6 +53,32 @@ async function init() {
       );
     `);
 
+    // Idempotent migrations for new columns
+    await client.query(`
+      DO $$ BEGIN
+        BEGIN ALTER TABLE users ADD COLUMN role    VARCHAR(20)  DEFAULT 'user';  EXCEPTION WHEN duplicate_column THEN NULL; END;
+        BEGIN ALTER TABLE users ADD COLUMN blocked BOOLEAN      DEFAULT false;   EXCEPTION WHEN duplicate_column THEN NULL; END;
+      END $$;
+
+      CREATE TABLE IF NOT EXISTS reports (
+        id          SERIAL PRIMARY KEY,
+        user_id     INTEGER REFERENCES users(id) ON DELETE SET NULL,
+        user_name   VARCHAR(100) DEFAULT '',
+        type        VARCHAR(20) NOT NULL,
+        description TEXT NOT NULL,
+        status      VARCHAR(20) DEFAULT 'new',
+        created_at  TIMESTAMPTZ DEFAULT NOW()
+      );
+
+      CREATE TABLE IF NOT EXISTS maintenance (
+        id      INTEGER PRIMARY KEY DEFAULT 1,
+        active  BOOLEAN DEFAULT false,
+        message TEXT    DEFAULT ''
+      );
+
+      INSERT INTO maintenance (id, active, message) VALUES (1, false, '') ON CONFLICT (id) DO NOTHING;
+    `);
+
     const { rows } = await client.query('SELECT COUNT(*) FROM terrains WHERE is_seeded = true');
     if (parseInt(rows[0].count) === 0) {
       console.log('Seeding terrains...');

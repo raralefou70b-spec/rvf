@@ -4,8 +4,8 @@ const jwt     = require('jsonwebtoken');
 const { pool } = require('../db');
 const { requireAuth } = require('../middleware/auth');
 
-function makeToken(userId) {
-  return jwt.sign({ id: userId }, process.env.JWT_SECRET, { expiresIn: '30d' });
+function makeToken(userId, role = 'user') {
+  return jwt.sign({ id: userId, role }, process.env.JWT_SECRET, { expiresIn: '30d' });
 }
 
 function safeUser(row) {
@@ -30,7 +30,7 @@ router.post('/register', async (req, res) => {
       [name.trim(), email.toLowerCase().trim(), hash, city || '', sport || '', level || 'Amateur']
     );
     const user  = safeUser(rows[0]);
-    const token = makeToken(user.id);
+    const token = makeToken(user.id, user.role || 'user');
     res.status(201).json({ token, user });
   } catch (err) {
     if (err.code === '23505') return res.status(409).json({ error: 'Email déjà utilisé.' });
@@ -57,7 +57,7 @@ router.post('/login', async (req, res) => {
     if (!ok) return res.status(401).json({ error: 'Email ou mot de passe incorrect.' });
 
     const user  = safeUser(row);
-    const token = makeToken(user.id);
+    const token = makeToken(user.id, user.role || 'user');
     res.json({ token, user });
   } catch (err) {
     console.error(err);

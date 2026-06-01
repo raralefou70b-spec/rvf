@@ -4113,7 +4113,7 @@ function MessagingView({ user, openWith }) {
 }
 
 // ─── PROFILE VIEW ─────────────────────────────────────────────────────────────
-function ProfileView({ user, onLogout, onUpdate }) {
+function ProfileView({ user, onLogout, onUpdate, onGoSupport, onGoAdmin }) {
   const {t, i18n: i18nInst} = useTranslation();
   const [editing,setEditing] = useState(false);
   const [name,setName]       = useState(user.name);
@@ -4358,6 +4358,31 @@ function ProfileView({ user, onLogout, onUpdate }) {
           </div>
         </div>
 
+        {/* Support & Sécurité */}
+        <div style={{background:C.card,border:`1px solid ${C.border}`,borderRadius:14,padding:14,marginBottom:16}}>
+          <div style={{fontSize:10,fontWeight:700,color:C.sub,textTransform:"uppercase",letterSpacing:1.5,marginBottom:10}}>🛡️ Support & Sécurité</div>
+          <button onClick={onGoSupport}
+            style={{width:"100%",background:C.card2,border:`1px solid ${C.border}`,borderRadius:10,padding:"11px 14px",display:"flex",alignItems:"center",gap:12,cursor:"pointer",fontFamily:C.font}}>
+            <span style={{fontSize:20}}>🛡️</span>
+            <div style={{flex:1,textAlign:"left"}}>
+              <div style={{fontWeight:700,color:C.text,fontSize:13}}>Support & Signalements</div>
+              <div style={{fontSize:11,color:C.sub,marginTop:2}}>Signaler un bug ou une activité suspecte</div>
+            </div>
+            <span style={{color:C.sub,fontSize:16}}>›</span>
+          </button>
+          {user.role === "admin" && (
+            <button onClick={onGoAdmin}
+              style={{width:"100%",background:`${C.accent}10`,border:`1px solid ${C.accent}33`,borderRadius:10,padding:"11px 14px",display:"flex",alignItems:"center",gap:12,cursor:"pointer",fontFamily:C.font,marginTop:8}}>
+              <span style={{fontSize:20}}>⚙️</span>
+              <div style={{flex:1,textAlign:"left"}}>
+                <div style={{fontWeight:700,color:C.accent,fontSize:13}}>Panneau Admin</div>
+                <div style={{fontSize:11,color:C.sub,marginTop:2}}>Signalements, maintenance, blocages</div>
+              </div>
+              <span style={{color:C.accent,fontSize:16}}>›</span>
+            </button>
+          )}
+        </div>
+
         {editing && (
           <div style={{background:C.card,border:`1px solid ${C.border}`,borderRadius:14,padding:14}}>
             <div style={{fontSize:10,fontWeight:700,color:C.sub,textTransform:"uppercase",letterSpacing:1.5,marginBottom:10}}>Sports pratiqués</div>
@@ -4372,6 +4397,293 @@ function ProfileView({ user, onLogout, onUpdate }) {
             <div style={{display:"flex",gap:7,flexWrap:"wrap"}}>
               {LEVELS.map(l=><Chip key={l} active={level===l} onClick={()=>setLevel(l)} color={C.purple}>{l}</Chip>)}
             </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ─── SUPPORT VIEW ─────────────────────────────────────────────────────────────
+function SupportView({ user, onBack }) {
+  const [phase, setPhase] = useState("menu"); // "menu" | "bug" | "hack" | "maintenance"
+  const [desc,  setDesc]  = useState("");
+  const [sending, setSending] = useState(false);
+  const [sent,    setSent]    = useState(false);
+  const [err,     setErr]     = useState("");
+  const [maintenance, setMaintenance] = useState(null);
+
+  useEffect(() => {
+    fetch(`${API}/api/maintenance`, { signal: AbortSignal.timeout(3000) })
+      .then(r => r.ok ? r.json() : null)
+      .then(d => { if (d) setMaintenance(d); })
+      .catch(() => {});
+  }, []);
+
+  const submit = async () => {
+    if (!desc.trim() || desc.trim().length < 10) { setErr("Décris le problème (10 caractères min)."); return; }
+    setSending(true); setErr("");
+    try {
+      const res = await fetch(`${API}/api/reports`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", ...authHeader() },
+        body: JSON.stringify({ type: phase, description: desc.trim() }),
+        signal: AbortSignal.timeout(5000),
+      });
+      if (res.ok) { setSent(true); setDesc(""); }
+      else { const d = await res.json(); setErr(d.error || "Erreur lors de l'envoi."); }
+    } catch { setErr("Serveur inaccessible — réessaie plus tard."); }
+    finally { setSending(false); }
+  };
+
+  const backBtn = (
+    <button onClick={() => { setPhase("menu"); setSent(false); setErr(""); setDesc(""); }}
+      style={{display:"flex",alignItems:"center",gap:6,background:"none",border:"none",color:C.sub,fontSize:13,cursor:"pointer",fontFamily:C.font,marginBottom:20,padding:0}}>
+      ← Retour
+    </button>
+  );
+
+  if (phase === "maintenance") {
+    const active = maintenance?.active;
+    return (
+      <div style={{flex:1,overflowY:"auto",padding:24}}>
+        <div style={{maxWidth:500,margin:"0 auto"}}>
+          {backBtn}
+          <div style={{fontFamily:C.head,fontWeight:700,fontSize:22,color:C.text,marginBottom:20}}>🔧 Maintenances en cours</div>
+          {active
+            ? <div style={{background:`${C.orange}18`,border:`1px solid ${C.orange}44`,borderRadius:14,padding:20}}>
+                <div style={{fontWeight:700,color:C.orange,fontSize:15,marginBottom:8}}>⚠️ Maintenance active</div>
+                <div style={{color:C.text,fontSize:14,lineHeight:1.6}}>{maintenance.message || "Une maintenance est en cours."}</div>
+              </div>
+            : <div style={{background:C.card,border:`1px solid ${C.green}33`,borderRadius:14,padding:20,textAlign:"center"}}>
+                <div style={{fontSize:32,marginBottom:10}}>✅</div>
+                <div style={{color:C.green,fontWeight:700,fontSize:15}}>Aucune maintenance en cours</div>
+                <div style={{color:C.sub,fontSize:12,marginTop:6}}>Tous les services fonctionnent normalement.</div>
+              </div>
+          }
+        </div>
+      </div>
+    );
+  }
+
+  if (phase === "bug" || phase === "hack") {
+    const isHack = phase === "hack";
+    const color  = isHack ? C.red : C.blue;
+    return (
+      <div style={{flex:1,overflowY:"auto",padding:24}}>
+        <div style={{maxWidth:500,margin:"0 auto"}}>
+          {backBtn}
+          <div style={{fontFamily:C.head,fontWeight:700,fontSize:20,color:C.text,marginBottom:6}}>
+            {isHack ? "🔴 Signaler une activité suspecte" : "🐛 Signaler un bug"}
+          </div>
+          <div style={{fontSize:13,color:C.sub,marginBottom:20,lineHeight:1.5}}>
+            {isHack ? "Compte piraté, comportement abusif, contenu inapproprié..." : "Décris précisément le bug rencontré."}
+          </div>
+          {sent
+            ? <div style={{background:`${C.green}15`,border:`1px solid ${C.green}44`,borderRadius:14,padding:20,textAlign:"center"}}>
+                <div style={{fontSize:32,marginBottom:10}}>✅</div>
+                <div style={{color:C.green,fontWeight:700,fontSize:15}}>Signalement envoyé !</div>
+                <div style={{color:C.sub,fontSize:12,marginTop:6}}>Notre équipe va examiner ça rapidement.</div>
+                <button onClick={()=>setSent(false)}
+                  style={{marginTop:14,background:C.card2,border:`1px solid ${C.border}`,borderRadius:9,padding:"8px 18px",color:C.text,fontSize:12,cursor:"pointer",fontFamily:C.font}}>
+                  Envoyer un autre signalement
+                </button>
+              </div>
+            : <>
+                <textarea value={desc} onChange={e=>setDesc(e.target.value)} rows={6}
+                  placeholder={isHack ? "Ex: Un utilisateur m'envoie des messages menaçants..." : "Ex: Quand je clique sur 'Ajouter un terrain', l'app plante..."}
+                  style={{width:"100%",background:C.card2,border:`1.5px solid ${err?C.red:C.border}`,borderRadius:10,padding:"12px 14px",color:C.text,fontSize:13,fontFamily:C.font,outline:"none",resize:"vertical",lineHeight:1.6,marginBottom:12}}/>
+                {err && <ErrBox msg={err}/>}
+                <Btn onClick={submit} loading={sending} style={{background:color}}>
+                  {isHack ? "🔴 Signaler l'activité" : "🐛 Envoyer le rapport"}
+                </Btn>
+              </>
+          }
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div style={{flex:1,overflowY:"auto",padding:24}}>
+      <div style={{maxWidth:500,margin:"0 auto"}}>
+        <button onClick={onBack}
+          style={{display:"flex",alignItems:"center",gap:6,background:"none",border:"none",color:C.sub,fontSize:13,cursor:"pointer",fontFamily:C.font,marginBottom:20,padding:0}}>
+          ← Profil
+        </button>
+        <div style={{fontFamily:C.head,fontWeight:700,fontSize:24,color:C.text,marginBottom:6}}>🛡️ Support & Sécurité</div>
+        <div style={{fontSize:13,color:C.sub,marginBottom:24}}>Signale un problème ou consulte le statut des services.</div>
+        <div style={{display:"flex",flexDirection:"column",gap:10}}>
+          {[
+            { key:"bug",         icon:"🐛", title:"Signaler un bug",            desc:"L'app ne fonctionne pas comme prévu ?",    color:C.blue   },
+            { key:"hack",        icon:"🔴", title:"Activité suspecte / piratage",desc:"Compte compromis, comportement abusif...", color:C.red    },
+            { key:"maintenance", icon:"🔧", title:"Maintenances en cours",       desc:maintenance?.active?"⚠️ Une maintenance est active":"✅ Aucune maintenance", color:C.orange },
+          ].map(card => (
+            <button key={card.key} onClick={()=>setPhase(card.key)}
+              style={{background:C.card,border:`1px solid ${card.color}28`,borderRadius:14,padding:"14px 16px",textAlign:"left",cursor:"pointer",display:"flex",gap:14,alignItems:"center",fontFamily:C.font,width:"100%"}}>
+              <span style={{fontSize:26,flexShrink:0}}>{card.icon}</span>
+              <div style={{flex:1}}>
+                <div style={{fontWeight:700,color:C.text,fontSize:14}}>{card.title}</div>
+                <div style={{fontSize:12,color:C.sub,marginTop:3}}>{card.desc}</div>
+              </div>
+              <span style={{color:C.sub,fontSize:18,flexShrink:0}}>›</span>
+            </button>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─── ADMIN VIEW ────────────────────────────────────────────────────────────────
+function AdminView({ onBack, onMaintenanceChange }) {
+  const [tab,        setTab]        = useState("reports");
+  const [reports,    setReports]    = useState([]);
+  const [loading,    setLoading]    = useState(true);
+  const [maintActive, setMaintActive] = useState(false);
+  const [maintMsg,   setMaintMsg]   = useState("");
+  const [maintSaved, setMaintSaved] = useState(false);
+  const [blockEmail, setBlockEmail] = useState("");
+  const [blockResult,setBlockResult]= useState("");
+
+  useEffect(() => {
+    Promise.all([
+      fetch(`${API}/api/admin/reports`, { headers: authHeader(), signal: AbortSignal.timeout(5000) })
+        .then(r => r.ok ? r.json() : null).catch(() => null),
+      fetch(`${API}/api/maintenance`, { signal: AbortSignal.timeout(3000) })
+        .then(r => r.ok ? r.json() : null).catch(() => null),
+    ]).then(([rData, mData]) => {
+      if (rData?.reports) setReports(rData.reports);
+      if (mData) { setMaintActive(mData.active); setMaintMsg(mData.message || ""); }
+      setLoading(false);
+    });
+  }, []);
+
+  const updateStatus = (id, status) => {
+    setReports(prev => prev.map(r => r.id === id ? { ...r, status } : r));
+    fetch(`${API}/api/admin/reports/${id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json", ...authHeader() },
+      body: JSON.stringify({ status }),
+    }).catch(() => {});
+  };
+
+  const saveMaintenance = async () => {
+    const res = await fetch(`${API}/api/admin/maintenance`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json", ...authHeader() },
+      body: JSON.stringify({ active: maintActive, message: maintMsg }),
+    }).catch(() => null);
+    if (res?.ok) {
+      onMaintenanceChange(maintActive ? maintMsg : null);
+      setMaintSaved(true);
+      setTimeout(() => setMaintSaved(false), 2000);
+    }
+  };
+
+  const doBlock = async () => {
+    if (!blockEmail.trim()) return;
+    const res = await fetch(`${API}/api/admin/block`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", ...authHeader() },
+      body: JSON.stringify({ email: blockEmail.trim() }),
+    }).catch(() => null);
+    if (res?.ok) setBlockResult("✅ Utilisateur bloqué.");
+    else if (res?.status === 404) setBlockResult("❌ Email introuvable.");
+    else setBlockResult("❌ Erreur serveur.");
+  };
+
+  const STATUS_LABELS = { new:"🔵 Nouveau", in_progress:"🟡 En cours", resolved:"✅ Résolu" };
+  const STATUS_COLORS = { new:C.blue, in_progress:C.orange, resolved:C.green };
+
+  const tabs = [
+    { id:"reports",     label:"📋 Signalements", count: reports.filter(r=>r.status==="new").length },
+    { id:"maintenance", label:"🔧 Maintenance" },
+    { id:"block",       label:"🚫 Blocage" },
+  ];
+
+  return (
+    <div style={{flex:1,overflowY:"auto",padding:24}}>
+      <div style={{maxWidth:600,margin:"0 auto"}}>
+        <button onClick={onBack}
+          style={{display:"flex",alignItems:"center",gap:6,background:"none",border:"none",color:C.sub,fontSize:13,cursor:"pointer",fontFamily:C.font,marginBottom:16,padding:0}}>
+          ← Profil
+        </button>
+        <div style={{fontFamily:C.head,fontWeight:700,fontSize:22,color:C.accent,marginBottom:20}}>⚙️ Panneau Admin</div>
+
+        {/* Tabs */}
+        <div style={{display:"flex",gap:8,marginBottom:20}}>
+          {tabs.map(t => (
+            <button key={t.id} onClick={()=>setTab(t.id)}
+              style={{flex:1,padding:"9px 6px",borderRadius:10,border:`1px solid ${tab===t.id?C.accent+"44":C.border}`,background:tab===t.id?C.aLow:C.card,color:tab===t.id?C.accent:C.sub,fontSize:11,fontWeight:700,cursor:"pointer",fontFamily:C.font,position:"relative"}}>
+              {t.label}
+              {t.count>0 && <span style={{marginLeft:4,background:C.red,color:"#fff",borderRadius:10,padding:"1px 5px",fontSize:9,fontWeight:800}}>{t.count}</span>}
+            </button>
+          ))}
+        </div>
+
+        {/* Reports */}
+        {tab === "reports" && (
+          loading
+            ? <div style={{color:C.sub,textAlign:"center",padding:40}}>Chargement...</div>
+            : reports.length === 0
+              ? <div style={{color:C.sub,textAlign:"center",padding:40}}>Aucun signalement.</div>
+              : <div style={{display:"flex",flexDirection:"column",gap:10}}>
+                  {reports.map(r => (
+                    <div key={r.id} style={{background:C.card,border:`1px solid ${STATUS_COLORS[r.status]||C.border}22`,borderRadius:12,padding:14}}>
+                      <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",gap:8,marginBottom:8}}>
+                        <div>
+                          <span style={{fontSize:10,fontWeight:700,color:r.type==="hack"?C.red:C.blue,background:r.type==="hack"?`${C.red}18`:`${C.blue}18`,padding:"2px 8px",borderRadius:6,marginRight:8}}>
+                            {r.type==="hack"?"🔴 HACK":"🐛 BUG"}
+                          </span>
+                          <span style={{fontSize:11,color:C.sub}}>{r.user_name}</span>
+                        </div>
+                        <span style={{fontSize:10,color:C.sub,flexShrink:0}}>{new Date(r.created_at).toLocaleDateString("fr-FR")}</span>
+                      </div>
+                      <div style={{fontSize:13,color:C.text,lineHeight:1.5,marginBottom:10}}>{r.description}</div>
+                      <select value={r.status} onChange={e=>updateStatus(r.id,e.target.value)}
+                        style={{background:C.card2,border:`1px solid ${STATUS_COLORS[r.status]||C.border}55`,borderRadius:8,padding:"5px 10px",color:STATUS_COLORS[r.status]||C.text,fontSize:11,fontWeight:700,cursor:"pointer",fontFamily:C.font,outline:"none"}}>
+                        {Object.entries(STATUS_LABELS).map(([v,l])=><option key={v} value={v}>{l}</option>)}
+                      </select>
+                    </div>
+                  ))}
+                </div>
+        )}
+
+        {/* Maintenance */}
+        {tab === "maintenance" && (
+          <div style={{background:C.card,border:`1px solid ${C.border}`,borderRadius:14,padding:20}}>
+            <div style={{fontSize:13,fontWeight:700,color:C.text,marginBottom:16}}>Mode maintenance</div>
+            <div style={{display:"flex",alignItems:"center",gap:12,marginBottom:16}}>
+              <button onClick={()=>setMaintActive(p=>!p)}
+                style={{width:46,height:26,borderRadius:13,border:"none",cursor:"pointer",background:maintActive?C.orange:C.card2,transition:"background .2s",flexShrink:0,position:"relative"}}>
+                <div style={{width:20,height:20,borderRadius:"50%",background:"#fff",position:"absolute",top:3,transition:"left .2s",left:maintActive?23:3}}/>
+              </button>
+              <span style={{fontSize:13,fontWeight:600,color:maintActive?C.orange:C.sub}}>
+                {maintActive?"🔧 Maintenance ACTIVE":"✅ Services normaux"}
+              </span>
+            </div>
+            <textarea value={maintMsg} onChange={e=>setMaintMsg(e.target.value)} rows={3}
+              placeholder="Message affiché à tous les utilisateurs..."
+              style={{width:"100%",background:C.card2,border:`1px solid ${C.border}`,borderRadius:10,padding:"10px 12px",color:C.text,fontSize:13,fontFamily:C.font,outline:"none",resize:"vertical",marginBottom:12}}/>
+            <Btn onClick={saveMaintenance} style={{background:maintActive?C.orange:C.accent}}>
+              {maintSaved ? "✅ Sauvegardé !" : "Sauvegarder"}
+            </Btn>
+          </div>
+        )}
+
+        {/* Block */}
+        {tab === "block" && (
+          <div style={{background:C.card,border:`1px solid ${C.border}`,borderRadius:14,padding:20}}>
+            <div style={{fontSize:13,fontWeight:700,color:C.text,marginBottom:6}}>Bloquer un utilisateur</div>
+            <div style={{fontSize:12,color:C.sub,marginBottom:16}}>L'utilisateur ne pourra plus se connecter.</div>
+            <input value={blockEmail} onChange={e=>{setBlockEmail(e.target.value);setBlockResult("");}}
+              placeholder="Email de l'utilisateur..."
+              style={{width:"100%",background:C.card2,border:`1px solid ${C.border}`,borderRadius:9,padding:"10px 12px",color:C.text,fontSize:13,fontFamily:C.font,outline:"none",marginBottom:12}}/>
+            {blockResult && (
+              <div style={{marginBottom:12,fontSize:13,color:blockResult.startsWith("✅")?C.green:C.red,fontWeight:600}}>{blockResult}</div>
+            )}
+            <Btn onClick={doBlock} variant="danger">🚫 Bloquer cet utilisateur</Btn>
           </div>
         )}
       </div>
@@ -4811,8 +5123,9 @@ export default function App() {
   const [selTerrain,setTerrain] = useState(null);
   // Start with local TERRAINS constant; API load overrides in useEffect below
   const [terrains,setTerrains] = useState(TERRAINS);
-  const [showInvites,setShowInvites] = useState(false);
-  const [openMsgWith,setOpenMsgWith] = useState(null);
+  const [showInvites,setShowInvites]       = useState(false);
+  const [openMsgWith,setOpenMsgWith]       = useState(null);
+  const [maintenanceBanner,setMaintenanceBanner] = useState(null);
   const [userPos,setUserPos]   = useState(null);
   const [gpsError,setGpsError] = useState(null); // null | 1=denied | 2=unavailable | 3=timeout | 4=http
   const [gpsLoading,setGpsLoading] = useState(false);
@@ -4836,6 +5149,14 @@ export default function App() {
     fetch(`${API}/api/terrains`, { signal: AbortSignal.timeout(5000) })
       .then(r => r.ok ? r.json() : null)
       .then(d => { if (d?.terrains?.length) setTerrains(d.terrains); })
+      .catch(() => {});
+  },[]);
+
+  // Maintenance banner (shown globally when active)
+  useEffect(()=>{
+    fetch(`${API}/api/maintenance`, { signal: AbortSignal.timeout(3000) })
+      .then(r => r.ok ? r.json() : null)
+      .then(d => { if (d?.active) setMaintenanceBanner(d.message || "Maintenance en cours."); })
       .catch(() => {});
   },[]);
 
@@ -5020,6 +5341,13 @@ export default function App() {
         )}
       </div>
 
+      {/* Maintenance banner */}
+      {maintenanceBanner && (
+        <div style={{background:`${C.orange}18`,borderBottom:`1px solid ${C.orange}44`,padding:"8px 16px",textAlign:"center",fontSize:12,color:C.orange,fontWeight:600,flexShrink:0}}>
+          🔧 {maintenanceBanner}
+        </div>
+      )}
+
       {/* CONTENT */}
       <div style={{flex:1,display:"flex",overflow:"hidden",paddingBottom:isMobile&&screen==="app"?"calc(56px + env(safe-area-inset-bottom))":0}}>
         {screen==="landing"  && <Landing goLogin={()=>setScreen("login")} goRegister={()=>setScreen("register")}/>}
@@ -5032,7 +5360,9 @@ export default function App() {
         {screen==="app" && view==="teams"    && <TeamsView user={user} terrains={terrains} onGoToMessages={goToMessages}/>}
         {screen==="app" && view==="messages" && <MessagingView user={user} openWith={openMsgWith}/>}
         {screen==="app" && view==="social"   && <SocialView user={user} terrains={terrains} onGoToMessages={goToMessages}/>}
-        {screen==="app" && view==="profile"  && <ProfileView user={user} onLogout={doLogout} onUpdate={doUpdate}/>}
+        {screen==="app" && view==="profile"  && <ProfileView user={user} onLogout={doLogout} onUpdate={doUpdate} onGoSupport={()=>setView("support")} onGoAdmin={()=>setView("admin")}/>}
+        {screen==="app" && view==="support"  && <SupportView user={user} onBack={()=>setView("profile")}/>}
+        {screen==="app" && view==="admin" && user?.role==="admin" && <AdminView onBack={()=>setView("profile")} onMaintenanceChange={msg=>setMaintenanceBanner(msg)}/>}
 
         {showInvites && user && <InvitesPanel user={user} onClose={()=>setShowInvites(false)}/>}
       </div>
