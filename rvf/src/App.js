@@ -4,6 +4,7 @@ import PhoneInput from "react-phone-number-input";
 import "react-phone-number-input/style.css";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
+import { supabase } from "./supabaseClient";
 
 // Backend API base URL — set VITE_API_URL in .env for production
 const API = import.meta.env.VITE_API_URL || 'http://localhost:3001';
@@ -389,16 +390,23 @@ async function backendOnline() {
 }
 
 async function login(email, pwd) {
+  // Try Supabase auth first
+  const { data, error } = await supabase.auth.signInWithPassword({ email, password: pwd });
+  if (!error && data.user) {
+    const { data: profile } = await supabase.from('profiles').select('*').eq('id', data.user.id).single();
+    return profile || { id: data.user.id, email, name: data.user.user_metadata?.name || email, terrains: 0, matchs: 0, teams: 0, avatar: null };
+  }
+  // Fallback: Express backend
   if (await backendOnline()) {
     const res = await fetch(`${API}/api/auth/login`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ email, password: pwd }),
     });
-    const data = await res.json();
-    if (!res.ok) throw new Error(data.error || 'Connexion échouée.');
-    localStorage.setItem('rvf_token', data.token);
-    return data.user;
+    const d = await res.json();
+    if (!res.ok) throw new Error(d.error || 'Connexion échouée.');
+    localStorage.setItem('rvf_token', d.token);
+    return d.user;
   }
   // Fallback: local mock DB (dev / no backend)
   await pause(500);
@@ -408,16 +416,28 @@ async function login(email, pwd) {
 }
 
 async function register(form) {
+  // Try Supabase auth first
+  const { data, error } = await supabase.auth.signUp({
+    email: form.email,
+    password: form.password,
+    options: { data: { name: form.name } },
+  });
+  if (!error && data.user) {
+    const profile = { id: data.user.id, name: form.name, city: form.city, sports: form.sports, level: form.level, phone: form.phone, email: form.email, verified: false, role: 'user', terrains: 0, matchs: 0, teams: 0, avatar: null };
+    await supabase.from('profiles').upsert(profile);
+    return profile;
+  }
+  // Fallback: Express backend
   if (await backendOnline()) {
     const res = await fetch(`${API}/api/auth/register`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(form),
     });
-    const data = await res.json();
-    if (!res.ok) throw new Error(data.error || 'Inscription échouée.');
-    localStorage.setItem('rvf_token', data.token);
-    return data.user;
+    const d = await res.json();
+    if (!res.ok) throw new Error(d.error || 'Inscription échouée.');
+    localStorage.setItem('rvf_token', d.token);
+    return d.user;
   }
   // Fallback: local mock DB
   await pause(500);
@@ -5186,25 +5206,36 @@ export default function App() {
   const [gpsLoading,setGpsLoading] = useState(false);
   const isMobile = useIsMobile();
 
-  // Auto-login via JWT token (skips silently if backend is down)
+  // Auto-login via Supabase session (falls back to JWT token for Express backend)
   useEffect(()=>{
-    const token = localStorage.getItem('rvf_token');
-    if (!token) return;
-    fetch(`${API}/api/auth/me`, {
-      headers: { Authorization: `Bearer ${token}` },
-      signal: AbortSignal.timeout(3000),
-    })
-      .then(r => r.ok ? r.json() : null)
-      .then(d => { if (d?.user) { setUser(d.user); setScreen('app'); } })
-      .catch(() => {});
+    supabase.auth.getSession().then(async ({ data: { session } }) => {
+      if (session?.user) {
+        const { data: profile } = await supabase.from('profiles').select('*').eq('id', session.user.id).single();
+        if (profile) { setUser(profile); setScreen('app'); return; }
+      }
+      // Fallback: JWT
+      const token = localStorage.getItem('rvf_token');
+      if (!token) return;
+      fetch(`${API}/api/auth/me`, {
+        headers: { Authorization: `Bearer ${token}` },
+        signal: AbortSignal.timeout(3000),
+      })
+        .then(r => r.ok ? r.json() : null)
+        .then(d => { if (d?.user) { setUser(d.user); setScreen('app'); } })
+        .catch(() => {});
+    });
   },[]);
 
-  // Load terrains from backend; keep TERRAINS constant if backend unreachable
+  // Load terrains from Supabase; keep TERRAINS constant as fallback
   useEffect(()=>{
-    fetch(`${API}/api/terrains`, { signal: AbortSignal.timeout(5000) })
-      .then(r => r.ok ? r.json() : null)
-      .then(d => { if (d?.terrains?.length) setTerrains(d.terrains); })
-      .catch(() => {});
+    supabase.from('terrains').select('*').then(({ data, error }) => {
+      if (!error && data?.length) { setTerrains(data); return; }
+      // Fallback: Express backend
+      fetch(`${API}/api/terrains`, { signal: AbortSignal.timeout(5000) })
+        .then(r => r.ok ? r.json() : null)
+        .then(d => { if (d?.terrains?.length) setTerrains(d.terrains); })
+        .catch(() => {});
+    });
   },[]);
 
   // Maintenance banner (shown globally when active)
@@ -5264,6 +5295,7 @@ export default function App() {
   const doLogin    = u => { setUser(u); setScreen("app"); };
   const doRegister = u => { setUser(u); setScreen("welcome"); };
   const doLogout = () => {
+    supabase.auth.signOut();
     localStorage.removeItem('rvf_token');
     setUser(null); setScreen('landing'); setView('map');
   };
@@ -5280,6 +5312,9 @@ export default function App() {
   };
 
   const addTerrain = async t => {
+    const { data: inserted, error } = await supabase.from('terrains').insert(t).select().single();
+    if (!error && inserted) { setTerrains(p => [...p, inserted]); return; }
+    // Fallback: Express backend
     try {
       const res = await fetch(`${API}/api/terrains`, {
         method: 'POST',
@@ -5295,24 +5330,25 @@ export default function App() {
 
   const deleteTerrain = async id => {
     setTerrains(prev => prev.filter(t => t.id !== id));
-    try {
-      await fetch(`${API}/api/terrains/${id}`, {
-        method: 'DELETE',
-        headers: authHeader(),
-      });
-    } catch {}
+    const { error } = await supabase.from('terrains').delete().eq('id', id);
+    if (error) {
+      try { await fetch(`${API}/api/terrains/${id}`, { method: 'DELETE', headers: authHeader() }); } catch {}
+    }
   };
 
   const updateTerrainPhone = async (terrainId, phone) => {
     setTerrains(prev => prev.map(t => t.id===terrainId ? {...t, phone} : t));
     setTerrain(prev => prev?.id===terrainId ? {...prev, phone} : prev);
-    try {
-      await fetch(`${API}/api/terrains/${terrainId}/phone`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json', ...authHeader() },
-        body: JSON.stringify({ phone }),
-      });
-    } catch {}
+    const { error } = await supabase.from('terrains').update({ phone }).eq('id', terrainId);
+    if (error) {
+      try {
+        await fetch(`${API}/api/terrains/${terrainId}/phone`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json', ...authHeader() },
+          body: JSON.stringify({ phone }),
+        });
+      } catch {}
+    }
   };
 
   const goToMessages = name => { setOpenMsgWith(name); setView("messages"); setTerrain(null); };
