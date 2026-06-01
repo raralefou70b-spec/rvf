@@ -3,8 +3,8 @@ import { useTranslation } from "react-i18next";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 
-// Backend API base URL — set REACT_APP_API_URL in .env for production
-const API = process.env.REACT_APP_API_URL || 'http://localhost:3001';
+// Backend API base URL — set VITE_API_URL in .env for production
+const API = import.meta.env.VITE_API_URL || 'http://localhost:3001';
 
 function authHeader() {
   const t = localStorage.getItem('rvf_token');
