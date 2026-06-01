@@ -871,7 +871,7 @@ function LoginScreen({ onSuccess, goBack }) {
           <div style={{display:"flex",flexDirection:"column",gap:14,marginBottom:14}}>
             <Field label="Email" type="email" value={email} onChange={e=>setEmail(e.target.value)} placeholder="ton@email.com" error={err.email} icon="📧"/>
             <div style={{display:"flex",flexDirection:"column",gap:5}}>
-              <label style={{fontSize:11,fontWeight:700,color:C.sub,textTransform:"uppercase",letterSpacing:1}}>Mot de passe</label>
+              <label style={{fontSize:11,fontWeight:700,color:C.sub,textTransform:"uppercase",letterSpacing:1}}>{t('auth.password')}</label>
               <div style={{position:"relative"}}>
                 <span style={{position:"absolute",left:12,top:"50%",transform:"translateY(-50%)",fontSize:15,opacity:.5,pointerEvents:"none"}}>🔑</span>
                 <input type={showPwd?"text":"password"} value={pwd} onChange={e=>setPwd(e.target.value)} placeholder="••••••••"
@@ -899,6 +899,7 @@ function LoginScreen({ onSuccess, goBack }) {
 }
 
 function RegisterScreen({ onSuccess, goBack }) {
+  const {t} = useTranslation();
   const [step,setStep]     = useState(1);
   const [loading,setLoading] = useState(false);
   const [err,setErr]       = useState({});
@@ -922,19 +923,19 @@ function RegisterScreen({ onSuccess, goBack }) {
 
   const nextStep1 = () => {
     const e={};
-    if (!f.name.trim())                  e.name="Requis";
-    if (!/\S+@\S+\.\S+/.test(f.email))  e.email="Email invalide";
-    if (f.pwd.length<6)                  e.pwd="6 car. minimum";
-    if (f.pwd!==f.confirm)               e.confirm="Mots de passe différents";
+    if (!f.name.trim())                  e.name=t('auth.required');
+    if (!/\S+@\S+\.\S+/.test(f.email))  e.email=t('auth.email_invalid');
+    if (f.pwd.length<6)                  e.pwd=t('auth.pwd_min');
+    if (f.pwd!==f.confirm)               e.confirm=t('auth.pwd_mismatch');
     setErr(e);
     if (!Object.keys(e).length) setStep(2);
   };
 
   const sendSMS = async () => {
     const e={};
-    if (!f.city.trim())    e.city="Requise";
-    if (!f.sports.length)  e.sports="Au moins un sport";
-    if (!f.phone)          e.phone="Requis";
+    if (!f.city.trim())    e.city=t('auth.city_required');
+    if (!f.sports.length)  e.sports=t('auth.sports_required');
+    if (!f.phone)          e.phone=t('auth.phone_required');
     setErr(e);
     if (Object.keys(e).length) return;
     setSending(true);
@@ -948,7 +949,7 @@ function RegisterScreen({ onSuccess, goBack }) {
   };
 
   const verify = async () => {
-    if (inputCode.trim()===sentCode) {
+    if (inputCode.trim()===sentCode) { // eslint-disable-line
       setVerified(true);
       await pause(500);
       setLoading(true);
@@ -957,7 +958,7 @@ function RegisterScreen({ onSuccess, goBack }) {
       } catch(m) { setApiErr(m?.message||m); }
       finally { setLoading(false); }
     } else {
-      setCodeErr("Code incorrect. Réessayez ou renvoyez.");
+      setCodeErr(t('auth.code_error'));
     }
   };
 
@@ -975,18 +976,18 @@ function RegisterScreen({ onSuccess, goBack }) {
     <div style={{flex:1,display:"flex",alignItems:"center",justifyContent:"center",padding:24,overflowY:"auto"}}>
       <div style={{maxWidth:460,width:"100%"}}>
         <button onClick={step===1?goBack:()=>{setStep(s=>s-1);setCodeErr("");setInputCode("");}} style={{background:"none",border:"none",color:C.sub,cursor:"pointer",fontSize:13,marginBottom:20,fontFamily:C.font}}>
-          ← {step===1?"Retour":"Étape précédente"}
+          {step===1?t('auth.back'):t('auth.back_step')}
         </button>
         <div style={{background:C.card,border:`1px solid ${C.border}`,borderRadius:20,padding:28}}>
           <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:8}}>
             <div style={{fontFamily:C.head,fontWeight:700,fontSize:24,color:C.text}}>
-              {step===1?"Créer un compte":step===2?"Profil sportif":"Vérification SMS"}
+              {step===1?t('auth.register_step1'):step===2?t('auth.register_step2'):t('auth.register_step3')}
             </div>
-            <span style={{fontSize:11,color:C.sub,fontWeight:600}}>Étape {step}/3</span>
+            <span style={{fontSize:11,color:C.sub,fontWeight:600}}>{t('auth.step')} {step}/3</span>
           </div>
           {/* Progress */}
           <div style={{display:"flex",gap:6,marginBottom:22}}>
-            {["Infos","Profil","SMS"].map((l,i)=>(
+            {[t('auth.step_info'),t('auth.step_profile'),t('auth.step_sms')].map((l,i)=>(
               <div key={l} style={{flex:1}}>
                 <div style={{height:3,borderRadius:3,background:i<step?C.accent:C.card2,marginBottom:4,transition:"background .3s"}}/>
                 <div style={{fontSize:9,color:i<step?C.accent:C.sub,fontWeight:700,textAlign:"center"}}>{l}</div>
@@ -996,20 +997,20 @@ function RegisterScreen({ onSuccess, goBack }) {
 
           {step===1 && (
             <div style={{display:"flex",flexDirection:"column",gap:14}}>
-              <Field label="Nom complet" value={f.name} onChange={e=>set("name",e.target.value)} placeholder="Jean Dupont" error={err.name} icon="👤"/>
-              <Field label="Email" type="email" value={f.email} onChange={e=>set("email",e.target.value)} placeholder="ton@email.com" error={err.email} icon="📧"/>
-              <Field label="Mot de passe" type="password" value={f.pwd} onChange={e=>set("pwd",e.target.value)} placeholder="6 caractères minimum" error={err.pwd} icon="🔑" hint="Minimum 6 caractères"/>
-              <Field label="Confirmer" type="password" value={f.confirm} onChange={e=>set("confirm",e.target.value)} placeholder="••••••••" error={err.confirm} icon="🔒"/>
-              <Btn onClick={nextStep1}>Continuer →</Btn>
+              <Field label={t('auth.name')} value={f.name} onChange={e=>set("name",e.target.value)} placeholder="Jean Dupont" error={err.name} icon="👤"/>
+              <Field label={t('auth.email')} type="email" value={f.email} onChange={e=>set("email",e.target.value)} placeholder="ton@email.com" error={err.email} icon="📧"/>
+              <Field label={t('auth.password')} type="password" value={f.pwd} onChange={e=>set("pwd",e.target.value)} placeholder="••••••••" error={err.pwd} icon="🔑" hint={t('auth.pwd_hint')}/>
+              <Field label={t('auth.confirm_password')} type="password" value={f.confirm} onChange={e=>set("confirm",e.target.value)} placeholder="••••••••" error={err.confirm} icon="🔒"/>
+              <Btn onClick={nextStep1}>{t('auth.continue')}</Btn>
             </div>
           )}
 
           {step===2 && (
             <div style={{display:"flex",flexDirection:"column",gap:16}}>
               <CityAutocomplete value={f.city} onChange={v=>set("city",v)} error={err.city}/>
-              <PhoneField value={f.phone} onChange={v=>set("phone",v)} error={err.phone} hint="Un code de vérification vous sera envoyé"/>
+              <PhoneField value={f.phone} onChange={v=>set("phone",v)} error={err.phone} hint={t('auth.verification_hint')}/>
               <div>
-                <label style={{fontSize:11,fontWeight:700,color:C.sub,textTransform:"uppercase",letterSpacing:1,display:"block",marginBottom:8}}>Sports pratiqués</label>
+                <label style={{fontSize:11,fontWeight:700,color:C.sub,textTransform:"uppercase",letterSpacing:1,display:"block",marginBottom:8}}>{t('auth.sports')}</label>
                 <div style={{display:"flex",flexWrap:"wrap",gap:7}}>
                   {SPORTS.map(s=>(
                     <button key={s.id} onClick={()=>toggleSport(s.id)} style={{padding:"7px 11px",borderRadius:9,cursor:"pointer",fontFamily:C.font,fontWeight:600,fontSize:12,background:f.sports.includes(s.id)?`${s.color}20`:C.card2,border:`1px solid ${f.sports.includes(s.id)?s.color:C.border}`,color:f.sports.includes(s.id)?s.color:C.sub,display:"flex",alignItems:"center",gap:5}}>
@@ -1020,12 +1021,12 @@ function RegisterScreen({ onSuccess, goBack }) {
                 {err.sports && <span style={{fontSize:11,color:C.red,marginTop:5,display:"block"}}>{err.sports}</span>}
               </div>
               <div>
-                <label style={{fontSize:11,fontWeight:700,color:C.sub,textTransform:"uppercase",letterSpacing:1,display:"block",marginBottom:8}}>Niveau</label>
+                <label style={{fontSize:11,fontWeight:700,color:C.sub,textTransform:"uppercase",letterSpacing:1,display:"block",marginBottom:8}}>{t('auth.level')}</label>
                 <div style={{display:"flex",flexWrap:"wrap",gap:7}}>
                   {LEVELS.map(l=><Chip key={l} active={f.level===l} onClick={()=>set("level",l)} color={C.purple}>{l}</Chip>)}
                 </div>
               </div>
-              <Btn onClick={sendSMS} loading={sending} variant="solid">📱 Recevoir le code SMS →</Btn>
+              <Btn onClick={sendSMS} loading={sending} variant="solid">📱 {t('auth.send_code')} →</Btn>
             </div>
           )}
 
@@ -1033,24 +1034,24 @@ function RegisterScreen({ onSuccess, goBack }) {
             <div style={{display:"flex",flexDirection:"column",gap:14}}>
               <div style={{background:"rgba(77,171,247,.1)",border:"1px solid rgba(77,171,247,.3)",borderRadius:12,padding:14,textAlign:"center"}}>
                 <div style={{fontSize:28,marginBottom:4}}>📱</div>
-                <div style={{fontSize:13,fontWeight:700,color:C.blue}}>Code envoyé au {f.phone}</div>
-                <div style={{fontSize:12,color:C.sub,marginTop:2}}>Entrez le code à 6 chiffres reçu par SMS</div>
+                <div style={{fontSize:13,fontWeight:700,color:C.blue}}>{t('auth.code_sent_to')} {f.phone}</div>
+                <div style={{fontSize:12,color:C.sub,marginTop:2}}>{t('auth.code_hint')}</div>
               </div>
               <input value={inputCode} onChange={e=>{setInputCode(e.target.value.replace(/\D/g,"").slice(0,6));setCodeErr("");}}
                 placeholder="_ _ _ _ _ _" maxLength={6}
                 style={{width:"100%",background:C.card2,border:`1.5px solid ${codeErr?C.red:C.border}`,borderRadius:10,padding:"14px",color:C.text,fontSize:26,outline:"none",fontFamily:C.head,letterSpacing:10,textAlign:"center"}}/>
               {codeErr && <ErrBox msg={codeErr}/>}
-              {verified && <div style={{background:"rgba(81,207,102,.1)",border:"1px solid rgba(81,207,102,.3)",borderRadius:8,padding:"9px 14px",color:C.green,fontSize:13,fontWeight:700,textAlign:"center"}}>✅ Numéro vérifié !</div>}
+              {verified && <div style={{background:"rgba(81,207,102,.1)",border:"1px solid rgba(81,207,102,.3)",borderRadius:8,padding:"9px 14px",color:C.green,fontSize:13,fontWeight:700,textAlign:"center"}}>{t('auth.verified_number')}</div>}
               <ErrBox msg={apiErr}/>
-              <Btn onClick={verify} loading={loading} disabled={inputCode.length<6} variant="solid">✅ Vérifier et créer mon compte</Btn>
+              <Btn onClick={verify} loading={loading} disabled={inputCode.length<6} variant="solid">✅ {t('auth.verify')}</Btn>
               <div style={{textAlign:"center",fontSize:12,color:C.sub}}>
                 {timer>0
-                  ? <span>Renvoyer dans <span style={{color:C.accent,fontWeight:700}}>{timer}s</span></span>
-                  : <button onClick={resend} style={{background:"none",border:"none",color:C.accent,fontSize:12,cursor:"pointer",fontFamily:C.font,fontWeight:600}}>{sending?"⏳ Envoi…":"🔄 Renvoyer le code"}</button>
+                  ? <span>{t('auth.resend_in')} <span style={{color:C.accent,fontWeight:700}}>{timer}s</span></span>
+                  : <button onClick={resend} style={{background:"none",border:"none",color:C.accent,fontSize:12,cursor:"pointer",fontFamily:C.font,fontWeight:600}}>{sending?t('common.loading'):t('auth.resend_code')}</button>
                 }
               </div>
               <div style={{background:C.card2,border:`1px solid ${C.border}`,borderRadius:8,padding:"8px 12px",fontSize:11,color:C.sub,textAlign:"center"}}>
-                💡 Mode démo — code visible dans la console (F12)
+                {t('auth.demo_mode')}
               </div>
             </div>
           )}
@@ -1061,6 +1062,7 @@ function RegisterScreen({ onSuccess, goBack }) {
 }
 
 function WelcomeScreen({ user, onEnter }) {
+  const {t} = useTranslation();
   const [show,setShow] = useState(false);
   useEffect(()=>{ setTimeout(()=>setShow(true),80); },[]);
   return (
@@ -1068,14 +1070,14 @@ function WelcomeScreen({ user, onEnter }) {
       <div style={{maxWidth:380,width:"100%",textAlign:"center",transition:"all .5s",opacity:show?1:0,transform:show?"translateY(0)":"translateY(20px)"}}>
         <div style={{fontSize:60,marginBottom:12}}>🎉</div>
         <div style={{fontFamily:C.head,fontWeight:700,fontSize:32,color:C.text,marginBottom:6}}>
-          Bienvenue, {user.name.split(" ")[0]} !
+          {t('auth.welcome')} {user.name.split(" ")[0]} !
         </div>
-        <p style={{color:C.sub,fontSize:14,lineHeight:1.7,marginBottom:20}}>Ton compte RVF est prêt.</p>
+        <p style={{color:C.sub,fontSize:14,lineHeight:1.7,marginBottom:20}}>{t('auth.account_ready')}</p>
         <div style={{display:"flex",justifyContent:"center",gap:8,marginBottom:28,flexWrap:"wrap"}}>
           {user.sports?.map(sid=>{const s=SPORTS.find(x=>x.id===sid);return s?<Badge key={sid} label={`${s.emoji} ${s.label}`} color={s.color}/>:null;})}
           <Badge label={user.level} color={C.accent}/>
         </div>
-        <Btn onClick={onEnter} variant="solid">Explorer RVF →</Btn>
+        <Btn onClick={onEnter} variant="solid">{t('auth.explore')}</Btn>
       </div>
     </div>
   );
@@ -1083,10 +1085,11 @@ function WelcomeScreen({ user, onEnter }) {
 
 // ─── PHONE FIELD ─────────────────────────────────────────────────────────────
 function PhoneField({ value, onChange, error, hint }) {
+  const {t} = useTranslation();
   const [focus, setFocus] = useState(false);
   return (
     <div style={{display:"flex",flexDirection:"column",gap:5}}>
-      <label style={{fontSize:11,fontWeight:700,color:C.sub,textTransform:"uppercase",letterSpacing:1}}>Téléphone *</label>
+      <label style={{fontSize:11,fontWeight:700,color:C.sub,textTransform:"uppercase",letterSpacing:1}}>{t('auth.phone_label')} *</label>
       <div style={{background:C.card2,border:`1.5px solid ${error?C.red:focus?C.accent:C.border}`,borderRadius:10,padding:"0 14px",transition:"border-color .2s"}}>
         <PhoneInput
           international
@@ -1310,6 +1313,7 @@ const WORLD_CITIES = [
 ];
 
 function CityAutocomplete({ value, onChange, error, terrainCities=[] }) {
+  const {t} = useTranslation();
   const [open, setOpen] = useState(false);
   const [focus, setFocus] = useState(false);
   const [suggestions, setSuggestions] = useState([]);
@@ -1356,7 +1360,7 @@ function CityAutocomplete({ value, onChange, error, terrainCities=[] }) {
 
   return (
     <div ref={wrapRef} style={{display:"flex",flexDirection:"column",gap:5,position:"relative"}}>
-      <label style={{fontSize:11,fontWeight:700,color:C.sub,textTransform:"uppercase",letterSpacing:1}}>Ville *</label>
+      <label style={{fontSize:11,fontWeight:700,color:C.sub,textTransform:"uppercase",letterSpacing:1}}>{t('auth.city_label')} *</label>
       <div style={{position:"relative"}}>
         <span style={{position:"absolute",left:12,top:"50%",transform:"translateY(-50%)",fontSize:15,opacity:.5,pointerEvents:"none"}}>{loading ? "⏳" : "📍"}</span>
         <input
@@ -3515,6 +3519,7 @@ function TeamsView({ user, terrains, onGoToMessages }) {
 
 // ─── USER PROFILE MODAL ───────────────────────────────────────────────────────
 function UserProfileModal({ profile, currentUser, onClose, onGoToMessages }) {
+  const {t} = useTranslation();
   useStore(FRIENDS);
   useStore(FRIEND_REQ);
   const isFriend   = currentUser ? FRIENDS.has(currentUser.id, profile.id) : false;
@@ -3540,7 +3545,7 @@ function UserProfileModal({ profile, currentUser, onClose, onGoToMessages }) {
             <div>
               <div style={{display:"flex",alignItems:"center",gap:7}}>
                 <div style={{fontFamily:C.head,fontWeight:700,fontSize:20,color:C.text}}>{profile.name}</div>
-                {profile.verified&&<span style={{background:"rgba(81,207,102,.15)",color:C.green,border:"1px solid rgba(81,207,102,.4)",borderRadius:5,padding:"2px 7px",fontSize:9,fontWeight:700}}>✅ VÉRIFIÉ</span>}
+                {profile.verified&&<span style={{background:"rgba(81,207,102,.15)",color:C.green,border:"1px solid rgba(81,207,102,.4)",borderRadius:5,padding:"2px 7px",fontSize:9,fontWeight:700}}>{t('profile.verified')}</span>}
               </div>
               <div style={{fontSize:12,color:C.sub,marginTop:3}}>📍 {profile.city}</div>
               <div style={{marginTop:6}}><Badge label={profile.level} color={C.accent}/></div>
@@ -3548,7 +3553,7 @@ function UserProfileModal({ profile, currentUser, onClose, onGoToMessages }) {
           </div>
           {profile.bio&&<p style={{fontSize:13,color:C.sub,lineHeight:1.6,marginBottom:14,background:C.card2,borderRadius:10,padding:"10px 12px"}}>{profile.bio}</p>}
           <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:8,marginBottom:14}}>
-            {[["🏟️","Terrains",profile.terrains||0,C.blue],["VS","Matchs",profile.matchs||0,C.orange],["👥","Équipes",profile.teams||0,C.purple]].map(([icon,label,val,color])=>(
+            {[["🏟️",t('profile.stats_terrains'),profile.terrains||0,C.blue],["VS",t('profile.stats_matchs'),profile.matchs||0,C.orange],["👥",t('profile.stats_teams'),profile.teams||0,C.purple]].map(([icon,label,val,color])=>(
               <div key={label} style={{background:C.card2,borderRadius:10,padding:10,textAlign:"center"}}>
                 <div style={{fontSize:18,marginBottom:4,display:"flex",justifyContent:"center",alignItems:"center",minHeight:24}}>
                   {icon==="VS"
@@ -4197,7 +4202,7 @@ function ProfileView({ user, onLogout, onUpdate, onGoSupport, onGoAdmin }) {
                 ? <input value={name} onChange={e=>setName(e.target.value)} style={{background:C.card2,border:`1px solid ${C.accent}44`,borderRadius:7,padding:"5px 10px",color:C.text,fontSize:18,fontWeight:700,outline:"none",width:"100%",fontFamily:C.head}}/>
                 : <div style={{display:"flex",alignItems:"center",gap:8}}>
                     <div style={{fontFamily:C.head,fontWeight:700,fontSize:22,color:C.text}}>{user.name}</div>
-                    {user.verified&&<span style={{background:"rgba(81,207,102,.15)",color:C.green,border:"1px solid rgba(81,207,102,.4)",borderRadius:6,padding:"2px 8px",fontSize:10,fontWeight:700}}>✅ VÉRIFIÉ</span>}
+                    {user.verified&&<span style={{background:"rgba(81,207,102,.15)",color:C.green,border:"1px solid rgba(81,207,102,.4)",borderRadius:6,padding:"2px 8px",fontSize:10,fontWeight:700}}>{t('profile.verified')}</span>}
                   </div>
               }
               <div style={{fontSize:12,color:C.sub,marginTop:3}}>📍 {user.city}</div>
@@ -4247,7 +4252,7 @@ function ProfileView({ user, onLogout, onUpdate, onGoSupport, onGoAdmin }) {
           const sportEntries = Object.entries(bySport);
           return (
             <div style={{background:C.card,border:`1px solid ${C.border}`,borderRadius:14,padding:16,marginBottom:16}}>
-              <div style={{fontSize:10,fontWeight:700,color:C.sub,textTransform:"uppercase",letterSpacing:1.5,marginBottom:14}}>🏆 Palmarès</div>
+              <div style={{fontSize:10,fontWeight:700,color:C.sub,textTransform:"uppercase",letterSpacing:1.5,marginBottom:14}}>{t('profile.palmares')}</div>
 
               {/* W / D / L cards */}
               <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:8,marginBottom:14}}>
@@ -4263,8 +4268,8 @@ function ProfileView({ user, onLogout, onUpdate, onGoSupport, onGoAdmin }) {
               {/* Win-rate bar */}
               <div style={{marginBottom:14}}>
                 <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:5}}>
-                  <span style={{fontSize:11,color:C.sub}}>{total} match{total>1?"s":""} joué{total>1?"s":""}</span>
-                  <span style={{fontSize:12,fontWeight:700,color:winPct>=50?C.green:C.red}}>{winPct}% victoires</span>
+                  <span style={{fontSize:11,color:C.sub}}>{total} {t('profile.matches_played', {count:total})}</span>
+                  <span style={{fontSize:12,fontWeight:700,color:winPct>=50?C.green:C.red}}>{winPct}{t('profile.win_pct')}</span>
                 </div>
                 <div style={{height:8,borderRadius:4,background:C.card2,overflow:"hidden",display:"flex"}}>
                   {rec.w>0&&<div style={{height:"100%",background:C.green,width:`${winPct}%`,transition:"width .6s"}}/>}
@@ -4304,7 +4309,7 @@ function ProfileView({ user, onLogout, onUpdate, onGoSupport, onGoAdmin }) {
 
               {/* Historique des scores */}
               <div style={{marginTop:12}}>
-                <div style={{fontSize:10,fontWeight:700,color:C.sub,textTransform:"uppercase",letterSpacing:1,marginBottom:8}}>Historique</div>
+                <div style={{fontSize:10,fontWeight:700,color:C.sub,textTransform:"uppercase",letterSpacing:1,marginBottom:8}}>{t('profile.history_section')}</div>
                 <div style={{display:"flex",flexDirection:"column",gap:6}}>
                   {scored.slice().reverse().map(r=>{
                     const res = MATCH_SCORE._result(r, user.name);
@@ -4343,8 +4348,8 @@ function ProfileView({ user, onLogout, onUpdate, onGoSupport, onGoAdmin }) {
           return (
             <div style={{background:C.card,border:`1px solid ${C.border}`,borderRadius:14,padding:16,marginBottom:16}}>
               <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:14}}>
-                <div style={{fontSize:10,fontWeight:700,color:C.sub,textTransform:"uppercase",letterSpacing:1.5}}>🏟️ Terrains visités</div>
-                <span style={{fontSize:12,color:C.accent,fontWeight:700}}>{vTerrains.length} terrain{vTerrains.length>1?"s":""}</span>
+                <div style={{fontSize:10,fontWeight:700,color:C.sub,textTransform:"uppercase",letterSpacing:1.5}}>{t('profile.visited_terrains')}</div>
+                <span style={{fontSize:12,color:C.accent,fontWeight:700}}>{vTerrains.length} {t('profile.fields_visited', {count:vTerrains.length})}</span>
               </div>
 
               {/* Ratio par sport */}
@@ -4381,7 +4386,7 @@ function ProfileView({ user, onLogout, onUpdate, onGoSupport, onGoAdmin }) {
                       </div>
                       <div style={{textAlign:"right",flexShrink:0}}>
                         <div style={{fontSize:12,color:C.yellow,fontWeight:700}}>{t.rating>0?`⭐ ${t.rating}`:"🆕"}</div>
-                        <div style={{fontSize:10,color:C.sub,marginTop:2}}>{bookings.length} session{bookings.length>1?"s":""}</div>
+                        <div style={{fontSize:10,color:C.sub,marginTop:2}}>{bookings.length} {t('profile.sessions', {count:bookings.length})}</div>
                       </div>
                     </div>
                   );
@@ -4410,13 +4415,13 @@ function ProfileView({ user, onLogout, onUpdate, onGoSupport, onGoAdmin }) {
 
         {/* Support & Sécurité */}
         <div style={{background:C.card,border:`1px solid ${C.border}`,borderRadius:14,padding:14,marginBottom:16}}>
-          <div style={{fontSize:10,fontWeight:700,color:C.sub,textTransform:"uppercase",letterSpacing:1.5,marginBottom:10}}>🛡️ Support & Sécurité</div>
+          <div style={{fontSize:10,fontWeight:700,color:C.sub,textTransform:"uppercase",letterSpacing:1.5,marginBottom:10}}>🛡️ {t('profile.support_title')}</div>
           <button onClick={onGoSupport}
             style={{width:"100%",background:C.card2,border:`1px solid ${C.border}`,borderRadius:10,padding:"11px 14px",display:"flex",alignItems:"center",gap:12,cursor:"pointer",fontFamily:C.font}}>
             <span style={{fontSize:20}}>🛡️</span>
             <div style={{flex:1,textAlign:"left"}}>
-              <div style={{fontWeight:700,color:C.text,fontSize:13}}>Support & Signalements</div>
-              <div style={{fontSize:11,color:C.sub,marginTop:2}}>Signaler un bug ou une activité suspecte</div>
+              <div style={{fontWeight:700,color:C.text,fontSize:13}}>{t('profile.support_title')}</div>
+              <div style={{fontSize:11,color:C.sub,marginTop:2}}>{t('profile.support_sub')}</div>
             </div>
             <span style={{color:C.sub,fontSize:16}}>›</span>
           </button>
@@ -4425,8 +4430,8 @@ function ProfileView({ user, onLogout, onUpdate, onGoSupport, onGoAdmin }) {
               style={{width:"100%",background:`${C.accent}10`,border:`1px solid ${C.accent}33`,borderRadius:10,padding:"11px 14px",display:"flex",alignItems:"center",gap:12,cursor:"pointer",fontFamily:C.font,marginTop:8}}>
               <span style={{fontSize:20}}>⚙️</span>
               <div style={{flex:1,textAlign:"left"}}>
-                <div style={{fontWeight:700,color:C.accent,fontSize:13}}>Panneau Admin</div>
-                <div style={{fontSize:11,color:C.sub,marginTop:2}}>Signalements, maintenance, blocages</div>
+                <div style={{fontWeight:700,color:C.accent,fontSize:13}}>{t('profile.admin_title')}</div>
+                <div style={{fontSize:11,color:C.sub,marginTop:2}}>{t('profile.admin_sub')}</div>
               </div>
               <span style={{color:C.accent,fontSize:16}}>›</span>
             </button>
@@ -4435,7 +4440,7 @@ function ProfileView({ user, onLogout, onUpdate, onGoSupport, onGoAdmin }) {
 
         {editing && (
           <div style={{background:C.card,border:`1px solid ${C.border}`,borderRadius:14,padding:14}}>
-            <div style={{fontSize:10,fontWeight:700,color:C.sub,textTransform:"uppercase",letterSpacing:1.5,marginBottom:10}}>Sports pratiqués</div>
+            <div style={{fontSize:10,fontWeight:700,color:C.sub,textTransform:"uppercase",letterSpacing:1.5,marginBottom:10}}>{t('auth.sports')}</div>
             <div style={{display:"flex",gap:7,flexWrap:"wrap",marginBottom:14}}>
               {SPORTS.map(s=>(
                 <button key={s.id} onClick={()=>toggleSport(s.id)} style={{padding:"7px 12px",borderRadius:9,cursor:"pointer",fontFamily:C.font,fontWeight:600,fontSize:12,background:sports.includes(s.id)?`${s.color}20`:C.card2,border:`1px solid ${sports.includes(s.id)?s.color:C.border}`,color:sports.includes(s.id)?s.color:C.sub,display:"flex",alignItems:"center",gap:5}}>
@@ -4443,7 +4448,7 @@ function ProfileView({ user, onLogout, onUpdate, onGoSupport, onGoAdmin }) {
                 </button>
               ))}
             </div>
-            <div style={{fontSize:10,fontWeight:700,color:C.sub,textTransform:"uppercase",letterSpacing:1.5,marginBottom:10}}>Niveau</div>
+            <div style={{fontSize:10,fontWeight:700,color:C.sub,textTransform:"uppercase",letterSpacing:1.5,marginBottom:10}}>{t('auth.level')}</div>
             <div style={{display:"flex",gap:7,flexWrap:"wrap"}}>
               {LEVELS.map(l=><Chip key={l} active={level===l} onClick={()=>setLevel(l)} color={C.purple}>{l}</Chip>)}
             </div>
@@ -5385,8 +5390,8 @@ export default function App() {
 
         {screen==="landing" && (
           <div style={{display:"flex",gap:7}}>
-            <Btn onClick={()=>setScreen("login")}    variant="ghost" full={false} style={{padding:"6px 14px",fontSize:12}}>Connexion</Btn>
-            <Btn onClick={()=>setScreen("register")} variant="solid" full={false} style={{padding:"6px 14px",fontSize:12}}>S'inscrire</Btn>
+            <Btn onClick={()=>setScreen("login")}    variant="ghost" full={false} style={{padding:"6px 14px",fontSize:12}}>{t('auth.login_btn')}</Btn>
+            <Btn onClick={()=>setScreen("register")} variant="solid" full={false} style={{padding:"6px 14px",fontSize:12}}>{t('auth.register_btn')}</Btn>
           </div>
         )}
       </div>
