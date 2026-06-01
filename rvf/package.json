@@ -35,6 +35,9 @@
       "react-app/jest"
     ]
   },
+  "engines": {
+    "node": "18.x"
+  },
   "overrides": {
     "typescript": "4.9.5"
   },
