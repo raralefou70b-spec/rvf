@@ -36,7 +36,7 @@
     ]
   },
   "engines": {
-    "node": "18.x"
+    "node": "24.x"
   },
   "overrides": {
     "typescript": "4.9.5"
