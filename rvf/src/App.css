@@ -2,6 +2,32 @@
   text-align: center;
 }
 
+/* react-phone-number-input dark theme */
+.PhoneInput { display:flex; align-items:center; gap:8px; width:100%; }
+.PhoneInputCountrySelect {
+  background: transparent;
+  border: none;
+  color: #c4c4c4;
+  font-family: 'DM Sans', sans-serif;
+  font-size: 14px;
+  cursor: pointer;
+  outline: none;
+  padding: 2px 0;
+}
+.PhoneInputCountrySelectArrow { opacity: 0.5; }
+.PhoneInputInput {
+  background: transparent;
+  border: none;
+  color: #f0f0f0;
+  font-family: 'DM Sans', sans-serif;
+  font-size: 14px;
+  outline: none;
+  flex: 1;
+  min-width: 0;
+  padding: 11px 0;
+}
+.PhoneInputInput::placeholder { color: #444; }
+
 .App-logo {
   height: 40vmin;
   pointer-events: none;

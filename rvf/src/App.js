@@ -1,5 +1,7 @@
 import { useState, useRef, useEffect, useCallback } from "react";
 import { useTranslation } from "react-i18next";
+import PhoneInput from "react-phone-number-input";
+import "react-phone-number-input/style.css";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 
@@ -932,7 +934,7 @@ function RegisterScreen({ onSuccess, goBack }) {
     const e={};
     if (!f.city.trim())    e.city="Requise";
     if (!f.sports.length)  e.sports="Au moins un sport";
-    if (!f.phone.trim())   e.phone="Requis";
+    if (!f.phone)          e.phone="Requis";
     setErr(e);
     if (Object.keys(e).length) return;
     setSending(true);
@@ -1005,7 +1007,7 @@ function RegisterScreen({ onSuccess, goBack }) {
           {step===2 && (
             <div style={{display:"flex",flexDirection:"column",gap:16}}>
               <CityAutocomplete value={f.city} onChange={v=>set("city",v)} error={err.city}/>
-              <Field label="Téléphone" type="tel" value={f.phone} onChange={e=>set("phone",e.target.value)} placeholder="+33 6 12 34 56 78" error={err.phone} icon="📱" hint="Un code de vérification vous sera envoyé"/>
+              <PhoneField value={f.phone} onChange={v=>set("phone",v)} error={err.phone} hint="Un code de vérification vous sera envoyé"/>
               <div>
                 <label style={{fontSize:11,fontWeight:700,color:C.sub,textTransform:"uppercase",letterSpacing:1,display:"block",marginBottom:8}}>Sports pratiqués</label>
                 <div style={{display:"flex",flexWrap:"wrap",gap:7}}>
@@ -1075,6 +1077,28 @@ function WelcomeScreen({ user, onEnter }) {
         </div>
         <Btn onClick={onEnter} variant="solid">Explorer RVF →</Btn>
       </div>
+    </div>
+  );
+}
+
+// ─── PHONE FIELD ─────────────────────────────────────────────────────────────
+function PhoneField({ value, onChange, error, hint }) {
+  const [focus, setFocus] = useState(false);
+  return (
+    <div style={{display:"flex",flexDirection:"column",gap:5}}>
+      <label style={{fontSize:11,fontWeight:700,color:C.sub,textTransform:"uppercase",letterSpacing:1}}>Téléphone *</label>
+      <div style={{background:C.card2,border:`1.5px solid ${error?C.red:focus?C.accent:C.border}`,borderRadius:10,padding:"0 14px",transition:"border-color .2s"}}>
+        <PhoneInput
+          international
+          defaultCountry="FR"
+          value={value}
+          onChange={v=>onChange(v||"")}
+          onFocus={()=>setFocus(true)}
+          onBlur={()=>setFocus(false)}
+        />
+      </div>
+      {error && <span style={{fontSize:11,color:C.red}}>{error}</span>}
+      {hint && !error && <span style={{fontSize:10,color:C.sub}}>{hint}</span>}
     </div>
   );
 }
@@ -1288,42 +1312,68 @@ const WORLD_CITIES = [
 function CityAutocomplete({ value, onChange, error, terrainCities=[] }) {
   const [open, setOpen] = useState(false);
   const [focus, setFocus] = useState(false);
+  const [suggestions, setSuggestions] = useState([]);
+  const [loading, setLoading] = useState(false);
   const wrapRef = useRef();
+  const debounceRef = useRef();
 
-  const allCities = [...new Set([...terrainCities, ...WORLD_CITIES])].sort((a,b)=>a.localeCompare(b,"fr"));
-  const q = value.trim().toLowerCase();
-  const suggestions = q.length >= 1
-    ? allCities.filter(c => c.toLowerCase().startsWith(q) && c.toLowerCase() !== q).slice(0,8)
-      .concat(allCities.filter(c => !c.toLowerCase().startsWith(q) && c.toLowerCase().includes(q) && c.toLowerCase() !== q).slice(0,4))
-      .slice(0,10)
-    : [];
+  useEffect(() => {
+    const q = value.trim();
+    if (q.length < 2) { setSuggestions([]); return; }
+    clearTimeout(debounceRef.current);
+    debounceRef.current = setTimeout(async () => {
+      setLoading(true);
+      try {
+        const res = await fetch(
+          `https://nominatim.openstreetmap.org/search?city=${encodeURIComponent(q)}&format=json&addressdetails=1&limit=8&email=app@rvf.app`,
+          { headers: { 'Accept-Language': 'fr' } }
+        );
+        const data = await res.json();
+        const seen = new Set();
+        const cities = [];
+        for (const r of data) {
+          const city = r.address?.city || r.address?.town || r.address?.village || r.address?.municipality || r.name;
+          const country = r.address?.country;
+          if (!city) continue;
+          const label = country ? `${city}, ${country}` : city;
+          if (!seen.has(label)) { seen.add(label); cities.push(label); }
+        }
+        const localMatches = terrainCities
+          .filter(c => c.toLowerCase().includes(q.toLowerCase()) && !cities.some(x => x.startsWith(c)))
+          .slice(0, 3);
+        setSuggestions([...localMatches, ...cities].slice(0, 10));
+      } catch { setSuggestions([]); }
+      finally { setLoading(false); }
+    }, 400);
+    return () => clearTimeout(debounceRef.current);
+  }, [value]);
 
-  useEffect(()=>{
+  useEffect(() => {
     const handler = e => { if (wrapRef.current && !wrapRef.current.contains(e.target)) setOpen(false); };
     document.addEventListener("mousedown", handler);
-    return ()=>document.removeEventListener("mousedown", handler);
-  },[]);
+    return () => document.removeEventListener("mousedown", handler);
+  }, []);
 
   return (
     <div ref={wrapRef} style={{display:"flex",flexDirection:"column",gap:5,position:"relative"}}>
       <label style={{fontSize:11,fontWeight:700,color:C.sub,textTransform:"uppercase",letterSpacing:1}}>Ville *</label>
       <div style={{position:"relative"}}>
-        <span style={{position:"absolute",left:12,top:"50%",transform:"translateY(-50%)",fontSize:15,opacity:.5,pointerEvents:"none"}}>📍</span>
+        <span style={{position:"absolute",left:12,top:"50%",transform:"translateY(-50%)",fontSize:15,opacity:.5,pointerEvents:"none"}}>{loading ? "⏳" : "📍"}</span>
         <input
           value={value}
           onChange={e=>{ onChange(e.target.value); setOpen(true); }}
           onFocus={()=>{ setFocus(true); setOpen(true); }}
           onBlur={()=>setFocus(false)}
-          placeholder="Paris, Lyon, Londres…"
+          placeholder="Paris, Tokyo, New York… (2 lettres min)"
           autoComplete="off"
           style={{width:"100%",background:C.card2,border:`1.5px solid ${error?C.red:focus?C.accent:C.border}`,borderRadius:10,padding:"11px 14px 11px 40px",color:C.text,fontSize:14,outline:"none",fontFamily:C.font,transition:"border-color .2s",boxSizing:"border-box"}}
         />
       </div>
       {error && <span style={{fontSize:11,color:C.red}}>{error}</span>}
-      {open && suggestions.length>0 && (
+      {open && suggestions.length > 0 && (
         <div style={{position:"absolute",top:"100%",left:0,right:0,zIndex:9999,background:C.card,border:`1px solid ${C.accent}55`,borderRadius:10,overflow:"hidden",boxShadow:"0 8px 32px rgba(0,0,0,.6)",marginTop:2}}>
-          {suggestions.map(c=>(
-            <button key={c} onMouseDown={()=>{ onChange(c); setOpen(false); }}
+          {suggestions.map(c => (
+            <button key={c} onMouseDown={() => { onChange(c); setOpen(false); }}
               style={{display:"block",width:"100%",textAlign:"left",padding:"9px 14px",background:"none",border:"none",color:C.text,fontSize:13,cursor:"pointer",fontFamily:C.font,borderBottom:`1px solid ${C.border}`}}
               onMouseEnter={e=>e.currentTarget.style.background=C.aLow}
               onMouseLeave={e=>e.currentTarget.style.background="none"}>
