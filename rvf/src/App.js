@@ -4401,20 +4401,20 @@ function ProfileView({ user, onLogout, onUpdate, onGoSupport, onGoAdmin }) {
 
               {/* Cards terrains */}
               <div style={{display:"flex",flexDirection:"column",gap:8}}>
-                {vTerrains.map(t=>{
-                  const s=SPORTS.find(x=>x.id===t.sport);
-                  const bookings=BOOK.forUser(user.name).filter(b=>b.terrainId===t.id);
+                {vTerrains.map(ter=>{
+                  const s=SPORTS.find(x=>x.id===ter.sport);
+                  const bookings=BOOK.forUser(user.name).filter(b=>b.terrainId===ter.id);
                   return (
-                    <div key={t.id} style={{background:C.card2,borderRadius:12,border:`1px solid ${C.border}`,borderLeft:`4px solid ${s?.color}`,padding:"11px 13px",display:"flex",alignItems:"center",gap:12}}>
+                    <div key={ter.id} style={{background:C.card2,borderRadius:12,border:`1px solid ${C.border}`,borderLeft:`4px solid ${s?.color}`,padding:"11px 13px",display:"flex",alignItems:"center",gap:12}}>
                       <div style={{width:40,height:40,borderRadius:10,background:`${s?.color}18`,border:`2px solid ${s?.color}35`,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0,fontSize:18}}>
                         {s?.id==="padel"?<PadelRacket size={18} color={s.color}/>:s?.emoji}
                       </div>
                       <div style={{flex:1,minWidth:0}}>
-                        <div style={{fontSize:13,fontWeight:700,color:C.text,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>{t.name}</div>
-                        <div style={{fontSize:11,color:C.sub,marginTop:2}}>📍 {t.city} · {t.surface}</div>
+                        <div style={{fontSize:13,fontWeight:700,color:C.text,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>{ter.name}</div>
+                        <div style={{fontSize:11,color:C.sub,marginTop:2}}>📍 {ter.city} · {ter.surface}</div>
                       </div>
                       <div style={{textAlign:"right",flexShrink:0}}>
-                        <div style={{fontSize:12,color:C.yellow,fontWeight:700}}>{t.rating>0?`⭐ ${t.rating}`:"🆕"}</div>
+                        <div style={{fontSize:12,color:C.yellow,fontWeight:700}}>{ter.rating>0?`⭐ ${ter.rating}`:"🆕"}</div>
                         <div style={{fontSize:10,color:C.sub,marginTop:2}}>{bookings.length} {t('profile.sessions', {count:bookings.length})}</div>
                       </div>
                     </div>
