@@ -362,6 +362,12 @@ const SEED_PLAYERS = [
   { name:"Carlos M.", flag:"🇪🇸" },
 ];
 
+const PAST_MATCHES = [
+  { id:"pm1", fromTeamId:1, fromTeamName:"Les Aigles FC", fromTeamAvatar:"🦅", toTeamId:4, toTeamName:"Bulldogs Rugby", toTeamAvatar:"🏉", sport:"football", date:"15 mai", terrainName:"Stade Charléty",    terrainCity:"Paris", scoreFrom:3, scoreTo:1 },
+  { id:"pm2", fromTeamId:5, fromTeamName:"FC Parisiens",  fromTeamAvatar:"⚽", toTeamId:1, toTeamName:"Les Aigles FC",  toTeamAvatar:"🦅", sport:"football", date:"28 avr", terrainName:"Terrain Ladoumègue", terrainCity:"Paris", scoreFrom:2, scoreTo:1 },
+  { id:"pm3", fromTeamId:1, fromTeamName:"Les Aigles FC", fromTeamAvatar:"🦅", toTeamId:2, toTeamName:"Slam Dunkers",  toTeamAvatar:"🏀", sport:"football", date:"10 avr", terrainName:"Stade Charléty",    terrainCity:"Paris", scoreFrom:2, scoreTo:2 },
+];
+
 const CITIES = {
   "paris":[48.856,2.352],"marseille":[43.296,5.369],"lyon":[45.764,4.835],
   "toulouse":[43.604,1.444],"nice":[43.710,7.262],"bordeaux":[44.837,-0.579],
@@ -3157,6 +3163,7 @@ function TeamsView({ user, terrains, onGoToMessages }) {
   const myTeamIds = myTeams.map(t=>t.id);
   const incomingChallenges = MATCH_REQ.list.filter(r=>myTeamIds.includes(r.toTeamId) && r.status==="pending");
   const incomingCount = incomingChallenges.length;
+  const pastMatches = PAST_MATCHES.filter(m=>myTeamIds.includes(m.fromTeamId)||myTeamIds.includes(m.toTeamId));
 
   const create = () => {
     if (!teamName.trim()) return;
@@ -3334,7 +3341,8 @@ function TeamsView({ user, terrains, onGoToMessages }) {
         {/* ── MATCHS TAB ── */}
         {viewTab==="matches" && (
           <div style={{display:"flex",flexDirection:"column",gap:12}}>
-            {/* Incoming challenges */}
+
+            {/* 1. Défis reçus — action requise */}
             {incomingChallenges.length>0 && (
               <>
                 <div style={{fontSize:11,fontWeight:700,color:C.orange,textTransform:"uppercase",letterSpacing:1,marginBottom:2}}>⚔️ Défis reçus</div>
@@ -3388,40 +3396,7 @@ function TeamsView({ user, terrains, onGoToMessages }) {
               </>
             )}
 
-            {/* Accepted / upcoming */}
-            {MATCH_REQ.list.filter(r=>(myTeamIds.includes(r.toTeamId)||(r.isSolo&&r.fromUserId===user?.id)||myTeamIds.includes(r.fromTeamId))&&r.status==="accepted").length>0 && (
-              <>
-                <div style={{fontSize:11,fontWeight:700,color:C.green,textTransform:"uppercase",letterSpacing:1,marginTop:4,marginBottom:2}}>✅ Matchs confirmés</div>
-                {MATCH_REQ.list.filter(r=>(myTeamIds.includes(r.toTeamId)||(r.isSolo&&r.fromUserId===user?.id)||myTeamIds.includes(r.fromTeamId))&&r.status==="accepted").map(r=>(
-                  <div key={r.id} style={{background:C.card,border:`1px solid ${C.green}44`,borderLeft:`4px solid ${C.green}`,borderRadius:14,padding:14}}>
-                    <div style={{display:"flex",alignItems:"center",gap:12,marginBottom:10}}>
-                      <div style={{flex:1,textAlign:"center"}}>
-                        {r.isSolo ? (
-                          <div style={{width:32,height:32,borderRadius:"50%",background:`${C.orange}25`,display:"flex",alignItems:"center",justifyContent:"center",margin:"0 auto 2px",fontSize:14,fontWeight:700,color:C.orange}}>{(r.fromUserName||"?")[0]}</div>
-                        ) : (
-                          <div style={{fontSize:24,marginBottom:2}}>{teams.find(t=>t.id===r.fromTeamId)?.avatar||"👥"}</div>
-                        )}
-                        <div style={{fontSize:11,fontWeight:700,color:C.text}}>{r.isSolo?r.fromUserName:r.fromTeamName}</div>
-                      </div>
-                      <div style={{fontFamily:C.head,fontWeight:800,fontSize:16,color:C.green,background:`${C.green}15`,border:`2px solid ${C.green}44`,borderRadius:8,padding:"4px 10px",letterSpacing:2}}>VS</div>
-                      <div style={{flex:1,textAlign:"center"}}>
-                        <div style={{fontSize:24,marginBottom:2}}>{teams.find(t=>t.id===r.toTeamId)?.avatar||"👥"}</div>
-                        <div style={{fontSize:11,fontWeight:700,color:C.text}}>{r.toTeamName}</div>
-                      </div>
-                    </div>
-                    <div style={{background:C.card2,borderRadius:10,padding:"8px 12px",display:"flex",flexDirection:"column",gap:4}}>
-                      <div style={{fontSize:12,color:C.green,fontWeight:700,textAlign:"center"}}>📅 {r.day} · ⏰ {r.hour} — Match confirmé !</div>
-                      <div style={{fontSize:11,color:r.terrainName?C.accent:C.sub,textAlign:"center"}}>
-                        📍 {r.terrainName?`${r.terrainName}${r.terrainCity?`, ${r.terrainCity}`:""}` : "Lieu à définir"}
-                      </div>
-                      {r.message&&<div style={{fontSize:11,color:C.sub,fontStyle:"italic",textAlign:"center",borderTop:`1px solid ${C.border}`,paddingTop:4}}>"{r.message}"</div>}
-                    </div>
-                  </div>
-                ))}
-              </>
-            )}
-
-            {/* Pending outgoing */}
+            {/* 2. Défis envoyés — en attente */}
             {MATCH_REQ.list.filter(r=>(myTeamIds.includes(r.fromTeamId)||(r.isSolo&&r.fromUserId===user?.id))&&r.status==="pending").length>0 && (
               <>
                 <div style={{fontSize:11,fontWeight:700,color:C.yellow,textTransform:"uppercase",letterSpacing:1,marginTop:4,marginBottom:2}}>⏳ Défis envoyés</div>
@@ -3454,20 +3429,82 @@ function TeamsView({ user, terrains, onGoToMessages }) {
               </>
             )}
 
-            {/* Declined */}
-            {MATCH_REQ.list.filter(r=>(myTeamIds.includes(r.toTeamId)||(r.isSolo&&r.fromUserId===user?.id)||myTeamIds.includes(r.fromTeamId))&&r.status==="declined").length>0 && (
+            {/* 3. Matchs à venir — défis acceptés */}
+            {MATCH_REQ.list.filter(r=>(myTeamIds.includes(r.toTeamId)||(r.isSolo&&r.fromUserId===user?.id)||myTeamIds.includes(r.fromTeamId))&&r.status==="accepted").length>0 && (
               <>
-                <div style={{fontSize:11,fontWeight:700,color:C.sub,textTransform:"uppercase",letterSpacing:1,marginTop:4,marginBottom:2}}>✕ Défis déclinés</div>
-                {MATCH_REQ.list.filter(r=>(myTeamIds.includes(r.toTeamId)||(r.isSolo&&r.fromUserId===user?.id)||myTeamIds.includes(r.fromTeamId))&&r.status==="declined").map(r=>(
-                  <div key={r.id} style={{background:C.card,border:`1px solid ${C.border}`,borderRadius:14,padding:12,opacity:.6}}>
-                    <div style={{fontSize:12,color:C.sub,textAlign:"center"}}>{r.isSolo?r.fromUserName:r.fromTeamName} <span style={{color:C.sub,fontWeight:700}}>VS</span> {r.toTeamName} — Décliné</div>
+                <div style={{fontSize:11,fontWeight:700,color:C.green,textTransform:"uppercase",letterSpacing:1,marginTop:4,marginBottom:2}}>📅 Matchs à venir</div>
+                {MATCH_REQ.list.filter(r=>(myTeamIds.includes(r.toTeamId)||(r.isSolo&&r.fromUserId===user?.id)||myTeamIds.includes(r.fromTeamId))&&r.status==="accepted").map(r=>(
+                  <div key={r.id} style={{background:C.card,border:`1px solid ${C.green}44`,borderLeft:`4px solid ${C.green}`,borderRadius:14,padding:14}}>
+                    <div style={{display:"flex",alignItems:"center",gap:12,marginBottom:10}}>
+                      <div style={{flex:1,textAlign:"center"}}>
+                        {r.isSolo ? (
+                          <div style={{width:32,height:32,borderRadius:"50%",background:`${C.orange}25`,display:"flex",alignItems:"center",justifyContent:"center",margin:"0 auto 2px",fontSize:14,fontWeight:700,color:C.orange}}>{(r.fromUserName||"?")[0]}</div>
+                        ) : (
+                          <div style={{fontSize:24,marginBottom:2}}>{teams.find(t=>t.id===r.fromTeamId)?.avatar||"👥"}</div>
+                        )}
+                        <div style={{fontSize:11,fontWeight:700,color:C.text}}>{r.isSolo?r.fromUserName:r.fromTeamName}</div>
+                      </div>
+                      <div style={{fontFamily:C.head,fontWeight:800,fontSize:16,color:C.green,background:`${C.green}15`,border:`2px solid ${C.green}44`,borderRadius:8,padding:"4px 10px",letterSpacing:2}}>VS</div>
+                      <div style={{flex:1,textAlign:"center"}}>
+                        <div style={{fontSize:24,marginBottom:2}}>{teams.find(t=>t.id===r.toTeamId)?.avatar||"👥"}</div>
+                        <div style={{fontSize:11,fontWeight:700,color:C.text}}>{r.toTeamName}</div>
+                      </div>
+                    </div>
+                    <div style={{background:C.card2,borderRadius:10,padding:"8px 12px",display:"flex",flexDirection:"column",gap:4}}>
+                      <div style={{fontSize:12,color:C.green,fontWeight:700,textAlign:"center"}}>📅 {r.day} · ⏰ {r.hour} — Match confirmé !</div>
+                      <div style={{fontSize:11,color:r.terrainName?C.accent:C.sub,textAlign:"center"}}>
+                        📍 {r.terrainName?`${r.terrainName}${r.terrainCity?`, ${r.terrainCity}`:""}` : "Lieu à définir"}
+                      </div>
+                      {r.message&&<div style={{fontSize:11,color:C.sub,fontStyle:"italic",textAlign:"center",borderTop:`1px solid ${C.border}`,paddingTop:4}}>"{r.message}"</div>}
+                    </div>
                   </div>
                 ))}
               </>
             )}
 
+            {/* 4. Matchs passés — historique avec scores */}
+            {pastMatches.length>0 && (
+              <>
+                <div style={{fontSize:11,fontWeight:700,color:C.purple,textTransform:"uppercase",letterSpacing:1,marginTop:4,marginBottom:2}}>🏆 Matchs passés</div>
+                {pastMatches.map(m=>{
+                  const myTeamIsFrom = myTeamIds.includes(m.fromTeamId);
+                  const myScore  = myTeamIsFrom ? m.scoreFrom : m.scoreTo;
+                  const oppScore = myTeamIsFrom ? m.scoreTo   : m.scoreFrom;
+                  const myName   = myTeamIsFrom ? m.fromTeamName : m.toTeamName;
+                  const myAvatar = myTeamIsFrom ? m.fromTeamAvatar : m.toTeamAvatar;
+                  const oppName  = myTeamIsFrom ? m.toTeamName  : m.fromTeamName;
+                  const oppAvatar= myTeamIsFrom ? m.toTeamAvatar  : m.fromTeamAvatar;
+                  const won  = myScore > oppScore;
+                  const draw = myScore === oppScore;
+                  const rc   = won ? C.green : draw ? C.yellow : C.red;
+                  const rl   = won ? "Victoire" : draw ? "Nul" : "Défaite";
+                  return (
+                    <div key={m.id} style={{background:C.card,border:`1px solid ${rc}33`,borderLeft:`4px solid ${rc}`,borderRadius:14,padding:14}}>
+                      <div style={{display:"flex",alignItems:"center",gap:12,marginBottom:8}}>
+                        <div style={{flex:1,textAlign:"center"}}>
+                          <div style={{fontSize:24,marginBottom:2}}>{myAvatar}</div>
+                          <div style={{fontSize:11,fontWeight:700,color:C.text}}>{myName}</div>
+                        </div>
+                        <div style={{textAlign:"center"}}>
+                          <div style={{fontFamily:C.head,fontWeight:800,fontSize:22,color:rc,letterSpacing:2}}>{myScore} – {oppScore}</div>
+                          <div style={{fontSize:10,fontWeight:700,color:rc,background:`${rc}18`,border:`1px solid ${rc}33`,borderRadius:5,padding:"2px 8px",marginTop:3,display:"inline-block"}}>{rl}</div>
+                        </div>
+                        <div style={{flex:1,textAlign:"center"}}>
+                          <div style={{fontSize:24,marginBottom:2}}>{oppAvatar}</div>
+                          <div style={{fontSize:11,fontWeight:700,color:C.text}}>{oppName}</div>
+                        </div>
+                      </div>
+                      <div style={{fontSize:11,color:C.sub,textAlign:"center"}}>
+                        📅 {m.date} · 📍 {m.terrainName}{m.terrainCity?`, ${m.terrainCity}`:""}
+                      </div>
+                    </div>
+                  );
+                })}
+              </>
+            )}
+
             {/* Empty state */}
-            {MATCH_REQ.list.filter(r=>myTeamIds.includes(r.toTeamId)||(r.isSolo&&r.fromUserId===user?.id)||myTeamIds.includes(r.fromTeamId)).length===0 && (
+            {MATCH_REQ.list.filter(r=>myTeamIds.includes(r.toTeamId)||(r.isSolo&&r.fromUserId===user?.id)||myTeamIds.includes(r.fromTeamId)).length===0 && pastMatches.length===0 && (
               <div style={{textAlign:"center",padding:"50px 20px"}}>
                 <div style={{fontSize:48,marginBottom:12}}>⚔️</div>
                 <div style={{fontSize:16,fontWeight:700,color:C.text,marginBottom:6}}>{t('teams.no_matches')}</div>
