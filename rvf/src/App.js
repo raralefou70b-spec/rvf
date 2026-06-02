@@ -525,6 +525,27 @@ CHAT.totalUnread = user => Object.entries(CHAT.convs)
   .filter(([id]) => id.includes(user))
   .reduce((s,[,msgs]) => s+msgs.filter(m=>m.from!==user&&!m.read).length, 0);
 
+// Team chat (group messages per team)
+const TEAM_CHAT = createStore({ byTeam:{}, lastRead:{} });
+TEAM_CHAT.send = (teamId, userId, userName, text) => {
+  const msgs = TEAM_CHAT.byTeam[teamId] || [];
+  TEAM_CHAT.byTeam[teamId] = [...msgs, { id:`tc_${Date.now()}`, userId, from:userName, text, ts:new Date().toISOString() }];
+  TEAM_CHAT.notify();
+};
+TEAM_CHAT.messages = teamId => TEAM_CHAT.byTeam[teamId] || [];
+TEAM_CHAT.markRead = (teamId, userId) => {
+  if (!TEAM_CHAT.lastRead[teamId]) TEAM_CHAT.lastRead[teamId] = {};
+  TEAM_CHAT.lastRead[teamId][userId] = new Date().toISOString();
+  TEAM_CHAT.notify();
+};
+TEAM_CHAT.unread = (teamId, userId) => {
+  const msgs = TEAM_CHAT.byTeam[teamId] || [];
+  const lr = TEAM_CHAT.lastRead[teamId]?.[userId] || "1970-01-01";
+  return msgs.filter(m => m.userId !== userId && m.ts > lr).length;
+};
+TEAM_CHAT.totalUnread = (userId, teamIds) =>
+  teamIds.reduce((s, tid) => s + TEAM_CHAT.unread(tid, userId), 0);
+
 // Invitations
 const INV = createStore({ list:[] });
 let _invCounter = 0;
@@ -698,6 +719,24 @@ setTimeout(() => {
   TEAM_REQ.send({ fromUserId:"u6", fromName:"Carlos M.", teamId:1, teamName:"Les Aigles FC", sport:"football", captainId:"u1", message:"Bonjour, intéressé pour rejoindre l'équipe ! Je joue milieu de terrain." });
   // Seeded match challenge: FC Parisiens defies Les Aigles FC
   MATCH_REQ.send({ fromTeamId:5, fromTeamName:"FC Parisiens", fromCaptainId:"u6", fromCaptainName:"Carlos M.", toTeamId:1, toTeamName:"Les Aigles FC", toCaptainId:"u1", sport:"football", day:"Sam", hour:"16h", terrainId:1, terrainName:"Stade Charléty", terrainCity:"Paris", message:"Salut les Aigles ! On vous défie pour un match amical ⚔️⚽" });
+  // Team chat seeds
+  const t0 = Date.now();
+  TEAM_CHAT.byTeam[1] = [
+    { id:"tc1_1", userId:"u2", from:"Lucas M.",    text:"Salut les Aigles ! ⚽ On a match samedi, tout le monde dispo ?", ts:new Date(t0-7200000).toISOString() },
+    { id:"tc1_2", userId:"u4", from:"Tom B.",      text:"Présent ! 💪", ts:new Date(t0-6900000).toISOString() },
+    { id:"tc1_3", userId:"u5", from:"Jade R.",     text:"Moi aussi, j'arrive de Rio la semaine prochaine 🌊", ts:new Date(t0-6600000).toISOString() },
+    { id:"tc1_4", userId:"u1", from:"Alex Martin", text:"Super, je réserve le terrain 🏟️", ts:new Date(t0-6300000).toISOString() },
+    { id:"tc1_5", userId:"u2", from:"Lucas M.",    text:"Génial, à samedi alors 🤝", ts:new Date(t0-6000000).toISOString() },
+  ];
+  TEAM_CHAT.byTeam[3] = [
+    { id:"tc3_1", userId:"u3", from:"Sara K.",    text:"Training demain 10h au Court Lenglen 🎾", ts:new Date(t0-3600000).toISOString() },
+    { id:"tc3_2", userId:"u6", from:"Carlos M.", text:"OK je serai là, j'ai de nouvelles balles 😄", ts:new Date(t0-3300000).toISOString() },
+    { id:"tc3_3", userId:"u3", from:"Sara K.",   text:"Parfait ! Alex tu viens aussi ?", ts:new Date(t0-3000000).toISOString() },
+  ];
+  // Alex has read team 1 fully; in team 3 he's seen only the first message
+  TEAM_CHAT.lastRead[1] = { u1: new Date(t0-5900000).toISOString() };
+  TEAM_CHAT.lastRead[3] = { u1: new Date(t0-3500000).toISOString() };
+  TEAM_CHAT.notify();
 }, 300);
 
 // Returns all sport IDs for a terrain (handles legacy single-string and new array)
@@ -4051,7 +4090,10 @@ function SocialView({ user, terrains, onGoToMessages }) {
 function MessagingView({ user, openWith }) {
   const {t} = useTranslation();
   useStore(CHAT);
+  useStore(TEAM_CHAT);
   useStore(FRIENDS);
+
+  // DM state
   const [sel,setSel]           = useState(null);
   const [newMsg,setNewMsg]     = useState("");
   const [showNew,setShowNew]   = useState(false);
@@ -4059,26 +4101,70 @@ function MessagingView({ user, openWith }) {
   const [showChat,setShowChat] = useState(false);
   const [viewProfile,setViewProfile] = useState(null);
   const msgEndRef              = useRef();
-  const isMobile               = useIsMobile();
 
+  // Team chat state
+  const [msgTab,setMsgTab]     = useState("dm"); // "dm" | "teams"
+  const [selTeam,setSelTeam]   = useState(null);
+  const [teamMsg,setTeamMsg]   = useState("");
+  const teamMsgEndRef          = useRef();
+
+  const isMobile = useIsMobile();
+
+  // DM derived
   const convs    = CHAT.list(user.name);
   const selConv  = sel ? CHAT.convs[sel]||[] : [];
   const selOther = sel ? sel.split("::").find(n=>n!==user.name) : null;
 
+  // Team derived
+  const userTeams = TEAMS_DATA.filter(t =>
+    (ROSTER[t.id]||[]).some(m=>m.id===user.id) || t.captainId===user.id
+  );
+  const sp = id => SPORTS.find(s=>s.id===id);
+  const selTeamObj  = selTeam ? TEAMS_DATA.find(t=>t.id===selTeam) : null;
+  const teamMsgs    = selTeam ? TEAM_CHAT.messages(selTeam) : [];
+  const dmUnread    = CHAT.totalUnread(user.name);
+  const teamUnread  = TEAM_CHAT.totalUnread(user.id, userTeams.map(t=>t.id));
+
   const getProfile = name => DB.find(u=>u.name===name) || { name, id:null, city:"", level:"Amateur", bio:"", avatar:null, sports:[] };
   const openProfile = name => { if(name!==user.name) setViewProfile(getProfile(name)); };
+  const selectConv  = id => { setSel(id); if(isMobile) setShowChat(true); };
 
-  const selectConv = id => { setSel(id); if(isMobile) setShowChat(true); };
-
+  // Open DM when navigating from another view
   useEffect(()=>{
     if (!openWith) return;
     const cid = CHAT.cid(user.name, openWith);
-    setSel(cid);
+    setSel(cid); setMsgTab("dm");
     if (isMobile) setShowChat(true);
   },[openWith]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  // DM auto-scroll + mark-read
   useEffect(()=>{ msgEndRef.current?.scrollIntoView({behavior:"smooth"}); },[selConv.length]);
   useEffect(()=>{ if(sel) CHAT.markRead(sel,user.name); },[sel,selConv.length]);
+
+  // Team chat auto-scroll + mark-read
+  useEffect(()=>{ teamMsgEndRef.current?.scrollIntoView({behavior:"smooth"}); },[selTeam,teamMsgs.length]);
+  useEffect(()=>{ if(selTeam) TEAM_CHAT.markRead(selTeam,user.id); },[selTeam,teamMsgs.length]);
+
+  // Supabase: load + subscribe to team messages
+  useEffect(()=>{
+    if (!selTeam) return;
+    supabase.from('team_messages').select('*').eq('team_id',selTeam).order('created_at',{ascending:true})
+      .then(({data})=>{
+        if (data?.length) {
+          TEAM_CHAT.byTeam[selTeam] = data.map(m=>({ id:m.id, userId:m.user_id, from:m.user_name, text:m.content, ts:m.created_at }));
+          TEAM_CHAT.notify();
+        }
+      });
+    const channel = supabase.channel(`team_chat_${selTeam}`)
+      .on('postgres_changes',{ event:'INSERT', schema:'public', table:'team_messages', filter:`team_id=eq.${selTeam}` }, payload=>{
+        const m = payload.new;
+        const nm = { id:m.id, userId:m.user_id, from:m.user_name, text:m.content, ts:m.created_at };
+        const ex = TEAM_CHAT.byTeam[selTeam] || [];
+        if (!ex.find(x=>x.id===m.id)) { TEAM_CHAT.byTeam[selTeam] = [...ex, nm]; TEAM_CHAT.notify(); }
+      })
+      .subscribe();
+    return () => supabase.removeChannel(channel);
+  },[selTeam]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const REPLIES = [t('messages.quick_reply_1'),t('messages.quick_reply_2'),t('messages.quick_reply_3'),t('messages.quick_reply_4'),t('messages.quick_reply_5'),t('messages.quick_reply_6')];
   const simulateReply = useCallback(from => {
@@ -4092,83 +4178,154 @@ function MessagingView({ user, openWith }) {
     setNewMsg("");
   };
 
+  const sendTeamMsg = async () => {
+    if (!teamMsg.trim()||!selTeam) return;
+    const text = teamMsg.trim();
+    setTeamMsg("");
+    TEAM_CHAT.send(selTeam, user.id, user.name, text);
+    await supabase.from('team_messages').insert({ team_id:selTeam, user_id:user.id, user_name:user.name, content:text });
+  };
+
   const openConvWith = name => {
     if (!name.trim()) return;
     const id = CHAT.cid(user.name, name.trim());
     setSel(id); setShowNew(false); setNewTo(""); if(isMobile) setShowChat(true);
   };
-  const startConv = () => openConvWith(newTo);
+
+  const switchTab = tab => {
+    setMsgTab(tab);
+    if (tab==="dm") { setSelTeam(null); }
+    else { setSel(null); }
+    if (isMobile) setShowChat(false);
+  };
 
   return (
     <div style={{flex:1,display:"flex",overflow:"hidden"}}>
       {/* Sidebar */}
       <div style={{width:isMobile?"100%":280,display:isMobile&&showChat?"none":"flex",background:C.card,borderRight:isMobile?"none":`1px solid ${C.border}`,flexDirection:"column",flexShrink:0}}>
+
+        {/* Header */}
         <div style={{padding:"14px 16px",borderBottom:`1px solid ${C.border}`,display:"flex",justifyContent:"space-between",alignItems:"center"}}>
           <div style={{fontFamily:C.head,fontWeight:700,fontSize:18,color:C.text}}>Messages</div>
-          <button onClick={()=>setShowNew(p=>!p)} style={{background:C.accent,border:"none",borderRadius:8,width:30,height:30,cursor:"pointer",color:"#06090f",fontSize:18,fontWeight:700,display:"flex",alignItems:"center",justifyContent:"center"}}>+</button>
+          {msgTab==="dm" && <button onClick={()=>setShowNew(p=>!p)} style={{background:C.accent,border:"none",borderRadius:8,width:30,height:30,cursor:"pointer",color:"#06090f",fontSize:18,fontWeight:700,display:"flex",alignItems:"center",justifyContent:"center"}}>+</button>}
         </div>
 
-        {showNew && (()=>{
-          const friendIds   = FRIENDS.list(user.id);
-          const friendList  = friendIds.map(id=>DB.find(u=>u.id===id)).filter(Boolean);
-          const otherPlayers= SEED_PLAYERS.filter(p=>p.name!==user.name&&!friendList.find(f=>f.name===p.name));
-          const allPlayers  = [...friendList.map(f=>({name:f.name,isFriend:true})), ...otherPlayers.map(p=>({name:p.name,isFriend:false}))];
-          const q = newTo.trim().toLowerCase();
-          const filtered = q ? allPlayers.filter(p=>p.name.toLowerCase().includes(q)) : allPlayers;
-          return (
-            <div style={{padding:12,borderBottom:`1px solid ${C.border}`,background:C.card2}}>
-              <div style={{fontSize:11,color:C.sub,fontWeight:700,marginBottom:8,textTransform:"uppercase",letterSpacing:1}}>{t('messages.new_conv')}</div>
-              <input value={newTo} onChange={e=>setNewTo(e.target.value)} placeholder="Rechercher un joueur…"
-                style={{width:"100%",background:C.card,border:`1px solid ${C.border}`,borderRadius:8,padding:"7px 10px",color:C.text,fontSize:12,outline:"none",fontFamily:C.font,boxSizing:"border-box",marginBottom:8}}/>
-              <div style={{display:"flex",flexDirection:"column",gap:4,maxHeight:180,overflowY:"auto"}}>
-                {filtered.length===0
-                  ? <div style={{fontSize:12,color:C.sub,textAlign:"center",padding:"12px 0"}}>{t('messages.no_player_found')}</div>
-                  : filtered.map(p=>(
-                    <button key={p.name} onClick={()=>openConvWith(p.name)}
-                      style={{display:"flex",alignItems:"center",gap:9,padding:"7px 10px",borderRadius:9,cursor:"pointer",fontFamily:C.font,background:C.card,border:`1px solid ${C.border}`,color:C.text,textAlign:"left",width:"100%"}}>
-                      <Avatar name={p.name} size={28} color={p.isFriend?C.accent:C.sub} photo={DB.find(u=>u.name===p.name)?.avatar}/>
-                      <div style={{flex:1,minWidth:0}}>
-                        <div style={{fontSize:12,fontWeight:700,color:C.text}}>{p.name}</div>
-                        {p.isFriend&&<div style={{fontSize:10,color:C.accent}}>👥 Ami</div>}
-                      </div>
-                      <span style={{fontSize:11,color:C.sub}}>💬</span>
-                    </button>
-                  ))
-                }
-              </div>
-            </div>
-          );
-        })()}
+        {/* Tab switcher */}
+        <div style={{display:"flex",gap:3,padding:"8px 10px",background:C.card,borderBottom:`1px solid ${C.border}`}}>
+          <button onClick={()=>switchTab("dm")}
+            style={{flex:1,borderRadius:8,border:"none",padding:"6px 4px",background:msgTab==="dm"?C.aLow:"transparent",color:msgTab==="dm"?C.accent:C.sub,fontSize:11,fontWeight:700,cursor:"pointer",fontFamily:C.font,position:"relative",display:"flex",alignItems:"center",justifyContent:"center",gap:4}}>
+            💬 DMs
+            {dmUnread>0 && <span style={{minWidth:15,height:15,borderRadius:8,background:C.accent,color:"#06090f",fontSize:9,fontWeight:800,display:"inline-flex",alignItems:"center",justifyContent:"center",padding:"0 3px"}}>{dmUnread}</span>}
+          </button>
+          <button onClick={()=>switchTab("teams")}
+            style={{flex:1,borderRadius:8,border:"none",padding:"6px 4px",background:msgTab==="teams"?`${C.purple}25`:"transparent",color:msgTab==="teams"?C.purple:C.sub,fontSize:11,fontWeight:700,cursor:"pointer",fontFamily:C.font,position:"relative",display:"flex",alignItems:"center",justifyContent:"center",gap:4}}>
+            👥 Équipes
+            {teamUnread>0 && <span style={{minWidth:15,height:15,borderRadius:8,background:C.purple,color:"#fff",fontSize:9,fontWeight:800,display:"inline-flex",alignItems:"center",justifyContent:"center",padding:"0 3px"}}>{teamUnread}</span>}
+          </button>
+        </div>
 
-        <div style={{flex:1,overflowY:"auto"}}>
-          {convs.length===0
-            ? <div style={{padding:20,textAlign:"center",color:C.sub,fontSize:13}}><div style={{fontSize:32,marginBottom:8}}>💬</div>{t('messages.no_conversations')}</div>
-            : convs.map(conv=>(
-                <div key={conv.id} onClick={()=>selectConv(conv.id)}
-                  style={{padding:"11px 14px",borderBottom:`1px solid ${C.border}`,cursor:"pointer",background:sel===conv.id?C.aLow:C.card,borderLeft:`3px solid ${sel===conv.id?C.accent:"transparent"}`}}>
+        {/* ── DM tab ── */}
+        {msgTab==="dm" && (
+          <>
+            {showNew && (()=>{
+              const friendIds   = FRIENDS.list(user.id);
+              const friendList  = friendIds.map(id=>DB.find(u=>u.id===id)).filter(Boolean);
+              const otherPlayers= SEED_PLAYERS.filter(p=>p.name!==user.name&&!friendList.find(f=>f.name===p.name));
+              const allPlayers  = [...friendList.map(f=>({name:f.name,isFriend:true})), ...otherPlayers.map(p=>({name:p.name,isFriend:false}))];
+              const q = newTo.trim().toLowerCase();
+              const filtered = q ? allPlayers.filter(p=>p.name.toLowerCase().includes(q)) : allPlayers;
+              return (
+                <div style={{padding:12,borderBottom:`1px solid ${C.border}`,background:C.card2}}>
+                  <div style={{fontSize:11,color:C.sub,fontWeight:700,marginBottom:8,textTransform:"uppercase",letterSpacing:1}}>{t('messages.new_conv')}</div>
+                  <input value={newTo} onChange={e=>setNewTo(e.target.value)} placeholder="Rechercher un joueur…"
+                    style={{width:"100%",background:C.card,border:`1px solid ${C.border}`,borderRadius:8,padding:"7px 10px",color:C.text,fontSize:12,outline:"none",fontFamily:C.font,boxSizing:"border-box",marginBottom:8}}/>
+                  <div style={{display:"flex",flexDirection:"column",gap:4,maxHeight:180,overflowY:"auto"}}>
+                    {filtered.length===0
+                      ? <div style={{fontSize:12,color:C.sub,textAlign:"center",padding:"12px 0"}}>{t('messages.no_player_found')}</div>
+                      : filtered.map(p=>(
+                        <button key={p.name} onClick={()=>openConvWith(p.name)}
+                          style={{display:"flex",alignItems:"center",gap:9,padding:"7px 10px",borderRadius:9,cursor:"pointer",fontFamily:C.font,background:C.card,border:`1px solid ${C.border}`,color:C.text,textAlign:"left",width:"100%"}}>
+                          <Avatar name={p.name} size={28} color={p.isFriend?C.accent:C.sub} photo={DB.find(u=>u.name===p.name)?.avatar}/>
+                          <div style={{flex:1,minWidth:0}}>
+                            <div style={{fontSize:12,fontWeight:700,color:C.text}}>{p.name}</div>
+                            {p.isFriend&&<div style={{fontSize:10,color:C.accent}}>👥 Ami</div>}
+                          </div>
+                          <span style={{fontSize:11,color:C.sub}}>💬</span>
+                        </button>
+                      ))
+                    }
+                  </div>
+                </div>
+              );
+            })()}
+            <div style={{flex:1,overflowY:"auto"}}>
+              {convs.length===0
+                ? <div style={{padding:20,textAlign:"center",color:C.sub,fontSize:13}}><div style={{fontSize:32,marginBottom:8}}>💬</div>{t('messages.no_conversations')}</div>
+                : convs.map(conv=>(
+                    <div key={conv.id} onClick={()=>selectConv(conv.id)}
+                      style={{padding:"11px 14px",borderBottom:`1px solid ${C.border}`,cursor:"pointer",background:sel===conv.id?C.aLow:C.card,borderLeft:`3px solid ${sel===conv.id?C.accent:"transparent"}`}}>
+                      <div style={{display:"flex",gap:10,alignItems:"center"}}>
+                        <div style={{position:"relative",flexShrink:0}}>
+                          <Avatar name={conv.other} size={36} color={C.accent}/>
+                          {conv.unread>0 && <div style={{position:"absolute",top:-2,right:-2,width:16,height:16,borderRadius:"50%",background:C.accent,display:"flex",alignItems:"center",justifyContent:"center",fontSize:9,fontWeight:800,color:"#06090f"}}>{conv.unread}</div>}
+                        </div>
+                        <div style={{flex:1,minWidth:0}}>
+                          <div style={{display:"flex",justifyContent:"space-between"}}>
+                            <span style={{fontSize:13,fontWeight:700,color:C.text}}>{conv.other}</span>
+                            <span style={{fontSize:10,color:C.sub}}>{conv.last?timeAgo(conv.last.ts):""}</span>
+                          </div>
+                          <div style={{fontSize:11,color:conv.unread>0?C.accent:C.sub,marginTop:2,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis",fontWeight:conv.unread>0?700:400}}>
+                            {conv.last?.from===user.name?"Vous : ":""}{conv.last?.text||"Nouvelle conversation"}
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  ))
+              }
+            </div>
+          </>
+        )}
+
+        {/* ── Teams tab ── */}
+        {msgTab==="teams" && (
+          <div style={{flex:1,overflowY:"auto"}}>
+            {userTeams.length===0 ? (
+              <div style={{padding:24,textAlign:"center",color:C.sub,fontSize:13}}>
+                <div style={{fontSize:32,marginBottom:8}}>👥</div>
+                Rejoins une équipe pour accéder au chat de groupe.
+              </div>
+            ) : userTeams.map(team=>{
+              const s = sp(team.sport);
+              const unr = TEAM_CHAT.unread(team.id, user.id);
+              const lastMsg = TEAM_CHAT.messages(team.id).slice(-1)[0];
+              const memberCount = TEAM_REQ.teamMemberCount(team.id);
+              return (
+                <div key={team.id} onClick={()=>{setSelTeam(team.id); if(isMobile) setShowChat(true);}}
+                  style={{padding:"11px 14px",borderBottom:`1px solid ${C.border}`,cursor:"pointer",background:selTeam===team.id?`${C.purple}15`:C.card,borderLeft:`3px solid ${selTeam===team.id?C.purple:"transparent"}`}}>
                   <div style={{display:"flex",gap:10,alignItems:"center"}}>
                     <div style={{position:"relative",flexShrink:0}}>
-                      <Avatar name={conv.other} size={36} color={C.accent}/>
-                      {conv.unread>0 && <div style={{position:"absolute",top:-2,right:-2,width:16,height:16,borderRadius:"50%",background:C.accent,display:"flex",alignItems:"center",justifyContent:"center",fontSize:9,fontWeight:800,color:"#06090f"}}>{conv.unread}</div>}
+                      <div style={{width:36,height:36,borderRadius:10,background:`${s?.color||C.purple}18`,border:`1px solid ${s?.color||C.purple}30`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:20}}>{s ? <SportEmoji sport={s} size={18}/> : team.avatar}</div>
+                      {unr>0 && <div style={{position:"absolute",top:-2,right:-2,width:16,height:16,borderRadius:"50%",background:C.purple,display:"flex",alignItems:"center",justifyContent:"center",fontSize:9,fontWeight:800,color:"#fff"}}>{unr}</div>}
                     </div>
                     <div style={{flex:1,minWidth:0}}>
                       <div style={{display:"flex",justifyContent:"space-between"}}>
-                        <span style={{fontSize:13,fontWeight:700,color:C.text}}>{conv.other}</span>
-                        <span style={{fontSize:10,color:C.sub}}>{conv.last?timeAgo(conv.last.ts):""}</span>
+                        <span style={{fontSize:13,fontWeight:700,color:C.text}}>{team.name}</span>
+                        <span style={{fontSize:10,color:C.sub}}>{lastMsg?timeAgo(lastMsg.ts):""}</span>
                       </div>
-                      <div style={{fontSize:11,color:conv.unread>0?C.accent:C.sub,marginTop:2,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis",fontWeight:conv.unread>0?700:400}}>
-                        {conv.last?.from===user.name?"Vous : ":""}{conv.last?.text||"Nouvelle conversation"}
+                      <div style={{fontSize:11,color:unr>0?C.purple:C.sub,marginTop:2,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis",fontWeight:unr>0?700:400}}>
+                        {lastMsg ? (lastMsg.userId===user.id?"Vous : ":lastMsg.from.split(" ")[0]+": ")+lastMsg.text : `${memberCount} membre${memberCount!==1?"s":""}`}
                       </div>
                     </div>
                   </div>
                 </div>
-              ))
-          }
-        </div>
+              );
+            })}
+          </div>
+        )}
       </div>
 
-      {/* Chat */}
-      {sel && selOther ? (
+      {/* ── DM chat panel ── */}
+      {msgTab==="dm" && sel && selOther ? (
         <div style={{flex:1,display:isMobile&&!showChat?"none":"flex",flexDirection:"column",background:C.bg}}>
           <div style={{padding:"12px 20px",background:C.card,borderBottom:`1px solid ${C.border}`,display:"flex",alignItems:"center",gap:12,flexShrink:0}}>
             {isMobile && <button onClick={()=>setShowChat(false)} style={{background:"none",border:"none",color:C.accent,fontSize:18,cursor:"pointer",padding:"0 6px 0 0",flexShrink:0}}>←</button>}
@@ -4186,7 +4343,6 @@ function MessagingView({ user, openWith }) {
               </div>
             </div>
           </div>
-
           <div style={{flex:1,overflowY:"auto",padding:"16px 20px",display:"flex",flexDirection:"column",gap:10}}>
             {selConv.length===0 && (
               <div style={{textAlign:"center",color:C.sub,fontSize:13,marginTop:40}}>
@@ -4199,7 +4355,7 @@ function MessagingView({ user, openWith }) {
               return (
                 <div key={msg.id} style={{display:"flex",justifyContent:isMe?"flex-end":"flex-start",gap:8,alignItems:"flex-end"}}>
                   {!isMe && (
-                    <div onClick={()=>openProfile(msg.from)} style={{cursor:"pointer",flexShrink:0}} title={`Voir le profil de ${msg.from}`}>
+                    <div onClick={()=>openProfile(msg.from)} style={{cursor:"pointer",flexShrink:0}}>
                       <Avatar name={msg.from} size={26} color={C.accent}/>
                     </div>
                   )}
@@ -4217,7 +4373,6 @@ function MessagingView({ user, openWith }) {
             })}
             <div ref={msgEndRef}/>
           </div>
-
           <div style={{padding:"12px 16px",background:C.card,borderTop:`1px solid ${C.border}`,display:"flex",gap:10,alignItems:"flex-end",flexShrink:0}}>
             <div style={{flex:1,background:C.card2,border:`1px solid ${C.border}`,borderRadius:14,padding:"10px 14px",display:"flex",alignItems:"center",gap:8}}>
               <textarea value={newMsg} onChange={e=>setNewMsg(e.target.value)}
@@ -4231,17 +4386,92 @@ function MessagingView({ user, openWith }) {
             </button>
           </div>
         </div>
+
+      /* ── Team chat panel ── */
+      ) : msgTab==="teams" && selTeam && selTeamObj ? (
+        <div style={{flex:1,display:isMobile&&!showChat?"none":"flex",flexDirection:"column",background:C.bg}}>
+          {/* Team header */}
+          <div style={{padding:"12px 20px",background:C.card,borderBottom:`1px solid ${C.border}`,display:"flex",alignItems:"center",gap:12,flexShrink:0}}>
+            {isMobile && <button onClick={()=>setShowChat(false)} style={{background:"none",border:"none",color:C.purple,fontSize:18,cursor:"pointer",padding:"0 6px 0 0",flexShrink:0}}>←</button>}
+            <div style={{width:40,height:40,borderRadius:11,background:`${sp(selTeamObj.sport)?.color||C.purple}18`,border:`1px solid ${sp(selTeamObj.sport)?.color||C.purple}40`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:20,flexShrink:0}}>
+              {sp(selTeamObj.sport) ? <SportEmoji sport={sp(selTeamObj.sport)} size={20}/> : selTeamObj.avatar}
+            </div>
+            <div style={{flex:1,minWidth:0}}>
+              <div style={{fontSize:15,fontWeight:700,color:C.text}}>{selTeamObj.name}</div>
+              <div style={{fontSize:11,color:C.sub,marginTop:1,display:"flex",alignItems:"center",gap:6}}>
+                <span style={{background:`${sp(selTeamObj.sport)?.color||C.purple}18`,color:sp(selTeamObj.sport)?.color||C.purple,borderRadius:5,padding:"1px 6px",fontWeight:600,fontSize:10}}>{sp(selTeamObj.sport)?.label||selTeamObj.sport}</span>
+                <span>· {TEAM_REQ.teamMemberCount(selTeam)} membres</span>
+              </div>
+            </div>
+          </div>
+
+          {/* Messages */}
+          <div style={{flex:1,overflowY:"auto",padding:"16px 20px",display:"flex",flexDirection:"column",gap:10}}>
+            {teamMsgs.length===0 && (
+              <div style={{textAlign:"center",color:C.sub,fontSize:13,marginTop:40}}>
+                <div style={{fontSize:40,marginBottom:8}}>👥</div>
+                Soyez le premier à écrire dans ce chat d'équipe !
+              </div>
+            )}
+            {teamMsgs.map(msg=>{
+              const isMe = msg.userId===user.id;
+              return (
+                <div key={msg.id} style={{display:"flex",justifyContent:isMe?"flex-end":"flex-start",gap:8,alignItems:"flex-end"}}>
+                  {!isMe && (
+                    <div onClick={()=>openProfile(msg.from)} style={{cursor:"pointer",flexShrink:0}}>
+                      <Avatar name={msg.from} size={26} color={C.purple}/>
+                    </div>
+                  )}
+                  <div style={{maxWidth:"68%"}}>
+                    {!isMe && <div style={{fontSize:10,color:C.sub,marginBottom:3,paddingLeft:2,fontWeight:600}}>{msg.from}</div>}
+                    <div style={{padding:"10px 14px",borderRadius:isMe?"16px 16px 4px 16px":"16px 16px 16px 4px",background:isMe?`${C.purple}22`:C.card,border:`1px solid ${isMe?C.purple+"55":C.border}`,fontSize:13,color:C.text,lineHeight:1.5}}>
+                      {msg.text}
+                    </div>
+                    <div style={{fontSize:9,color:C.sub,marginTop:3,textAlign:isMe?"right":"left"}}>
+                      {timeAgo(msg.ts)}
+                    </div>
+                  </div>
+                  {isMe && <Avatar name={user.name} size={26} color={C.purple} photo={user.avatar}/>}
+                </div>
+              );
+            })}
+            <div ref={teamMsgEndRef}/>
+          </div>
+
+          {/* Input */}
+          <div style={{padding:"12px 16px",background:C.card,borderTop:`1px solid ${C.border}`,display:"flex",gap:10,alignItems:"flex-end",flexShrink:0}}>
+            <div style={{flex:1,background:C.card2,border:`1px solid ${C.border}`,borderRadius:14,padding:"10px 14px",display:"flex",alignItems:"center",gap:8}}>
+              <textarea value={teamMsg} onChange={e=>setTeamMsg(e.target.value)}
+                onKeyDown={e=>{if(e.key==="Enter"&&!e.shiftKey){e.preventDefault();sendTeamMsg();}}}
+                placeholder={`Message à ${selTeamObj.name}…`} rows={1}
+                style={{flex:1,background:"none",border:"none",outline:"none",color:C.text,fontSize:13,fontFamily:C.font,resize:"none",lineHeight:1.4}}/>
+            </div>
+            <button onClick={sendTeamMsg} disabled={!teamMsg.trim()}
+              style={{width:42,height:42,borderRadius:12,border:"none",cursor:teamMsg.trim()?"pointer":"not-allowed",background:teamMsg.trim()?C.purple:C.card2,color:teamMsg.trim()?"#fff":C.sub,fontSize:18,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
+              ➤
+            </button>
+          </div>
+        </div>
+
+      /* ── Empty state ── */
       ) : (
-        <div style={{flex:1,display:"flex",alignItems:"center",justifyContent:"center",flexDirection:"column",gap:12,color:C.sub}}>
-          <div style={{fontSize:56}}>💬</div>
-          <div style={{fontFamily:C.head,fontWeight:700,fontSize:22,color:C.text}}>Vos messages</div>
-          <div style={{fontSize:13,textAlign:"center",maxWidth:280,lineHeight:1.6}}>
-            Sélectionnez une conversation ou cliquez sur <span style={{color:C.accent,fontWeight:700}}>+</span> pour contacter un joueur.
+        <div style={{flex:1,display:isMobile&&showChat?"flex":"flex",alignItems:"center",justifyContent:"center",flexDirection:"column",gap:12,color:C.sub}}>
+          {isMobile && showChat && <button onClick={()=>setShowChat(false)} style={{position:"absolute",top:70,left:16,background:"none",border:"none",color:C.accent,fontSize:18,cursor:"pointer"}}>←</button>}
+          <div style={{fontSize:56}}>{msgTab==="teams"?"👥":"💬"}</div>
+          <div style={{fontFamily:C.head,fontWeight:700,fontSize:22,color:C.text}}>
+            {msgTab==="teams" ? "Chats d'équipe" : "Vos messages"}
+          </div>
+          <div style={{fontSize:13,textAlign:"center",maxWidth:280,lineHeight:1.6,color:C.sub}}>
+            {msgTab==="teams"
+              ? "Sélectionnez une équipe pour voir le chat de groupe."
+              : <>Sélectionnez une conversation ou cliquez sur <span style={{color:C.accent,fontWeight:700}}>+</span> pour contacter un joueur.</>
+            }
           </div>
         </div>
       )}
+
       {viewProfile && <UserProfileModal profile={viewProfile} currentUser={user} onClose={()=>setViewProfile(null)}
-        onGoToMessages={name=>{ selectConv(CHAT.cid(user.name,name)); setViewProfile(null); }}/>}
+        onGoToMessages={name=>{ selectConv(CHAT.cid(user.name,name)); setMsgTab("dm"); setViewProfile(null); }}/>}
     </div>
   );
 }
@@ -5364,6 +5594,7 @@ export default function App() {
 
   // Unread msg count for badge
   useStore(CHAT);
+  useStore(TEAM_CHAT);
 
   const doLogin    = u => { setUser(u); setScreen("app"); };
   const doRegister = u => { setUser(u); setScreen("welcome"); };
@@ -5473,7 +5704,8 @@ export default function App() {
             {!isMobile && (
               <div style={{display:"flex",gap:3}}>
                 {NAV.map(n=>{
-                  const unread = n.id==="messages"&&user ? CHAT.totalUnread(user.name) : 0;
+                  const userTeamIds = user ? TEAMS_DATA.filter(t=>(ROSTER[t.id]||[]).some(m=>m.id===user.id)||t.captainId===user.id).map(t=>t.id) : [];
+                  const unread = n.id==="messages"&&user ? CHAT.totalUnread(user.name)+TEAM_CHAT.totalUnread(user.id,userTeamIds) : 0;
                   return (
                     <button key={n.id} onClick={()=>{setView(n.id);setTerrain(null);}}
                       style={{display:"flex",flexDirection:"column",alignItems:"center",gap:1,padding:"5px 14px",borderRadius:9,cursor:"pointer",position:"relative",background:view===n.id?C.aLow:"transparent",border:`1px solid ${view===n.id?C.accent+"44":"transparent"}`,color:view===n.id?C.accent:C.sub,fontSize:9,fontWeight:700,letterSpacing:1,fontFamily:C.font}}>
@@ -5535,7 +5767,8 @@ export default function App() {
       {isMobile && screen==="app" && (
         <div style={{position:"fixed",bottom:0,left:0,right:0,height:"calc(56px + env(safe-area-inset-bottom))",background:C.card,borderTop:`1px solid ${C.border}`,display:"flex",zIndex:200,paddingBottom:"env(safe-area-inset-bottom)"}}>
           {NAV.map(n=>{
-            const unread = n.id==="messages"&&user ? CHAT.totalUnread(user.name) : 0;
+            const userTeamIds = user ? TEAMS_DATA.filter(t=>(ROSTER[t.id]||[]).some(m=>m.id===user.id)||t.captainId===user.id).map(t=>t.id) : [];
+            const unread = n.id==="messages"&&user ? CHAT.totalUnread(user.name)+TEAM_CHAT.totalUnread(user.id,userTeamIds) : 0;
             const active = view===n.id;
             return (
               <button key={n.id} onClick={()=>{setView(n.id);setTerrain(null);}}
