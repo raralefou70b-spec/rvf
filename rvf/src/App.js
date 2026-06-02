@@ -1691,10 +1691,13 @@ function MapView({ onSelect, terrains, user, onAddTerrain, userPos, gpsError, gp
   const [viewMode,setViewMode] = useState("map"); // "list" | "map"
   const [mapClickPos,setMapClickPos] = useState(null);
   const [placementMode, setPlacementMode] = useState(false);
+  const [filterByProfile, setFilterByProfile] = useState(true);
   const mapInstanceRef = useRef(null);
 
+  const profileSports = user?.sports?.length ? user.sports : null;
   const sp = id => SPORTS.find(s=>s.id===id);
   const filtered = terrains.filter(t =>
+    (!filterByProfile || !profileSports || profileSports.some(sid => terrainSports(t).includes(sid))) &&
     (filter==="all"||terrainSports(t).includes(filter)) &&
     (t.name.toLowerCase().includes(search.toLowerCase()) ||
      (t.city||"").toLowerCase().includes(search.toLowerCase()) ||
@@ -1839,9 +1842,19 @@ function MapView({ onSelect, terrains, user, onAddTerrain, userPos, gpsError, gp
           </div>
         )}
         {/* Sport chips */}
-        <div style={{display:"flex",flexWrap:"wrap",gap:5}}>
+        <div style={{display:"flex",flexWrap:"wrap",gap:5,alignItems:"center"}}>
+          {profileSports && (
+            <button onClick={()=>{ setFilterByProfile(p=>!p); setFilter("all"); }}
+              style={{padding:"4px 10px",borderRadius:20,cursor:"pointer",fontFamily:C.font,fontWeight:700,fontSize:11,flexShrink:0,
+                background:filterByProfile?C.aLow:`${C.red}12`,
+                border:`1.5px solid ${filterByProfile?C.accent:C.red+"66"}`,
+                color:filterByProfile?C.accent:C.sub,
+                display:"flex",alignItems:"center",gap:5,transition:"all .15s"}}>
+              {filterByProfile ? <>🏅 {profileSports.map(id=>SPORTS.find(x=>x.id===id)?.emoji).join("")}</> : <>{tr('profile.see_all_sports')}</>}
+            </button>
+          )}
           <Chip sm active={filter==="all"} onClick={()=>setFilter("all")}>{tr('map.all')}</Chip>
-          {SPORTS.map(s=><Chip sm key={s.id} active={filter===s.id} onClick={()=>setFilter(s.id)} color={s.color}><SportEmoji sport={s} size={11}/> {s.label}</Chip>)}
+          {(filterByProfile && profileSports ? SPORTS.filter(s=>profileSports.includes(s.id)) : SPORTS).map(s=><Chip sm key={s.id} active={filter===s.id} onClick={()=>setFilter(s.id)} color={s.color}><SportEmoji sport={s} size={11}/> {s.label}</Chip>)}
         </div>
       </div>
 
@@ -4202,14 +4215,16 @@ function ProfileView({ user, onLogout, onUpdate, onGoSupport, onGoAdmin }) {
   const [editing,setEditing] = useState(false);
   const [name,setName]       = useState(user.name);
   const [bio,setBio]         = useState(user.bio||"");
-  const [sports,setSports]   = useState(user.sports||[]);
   const [level,setLevel]     = useState(user.level||"Amateur");
   const fileRef              = useRef();
   useStore(BOOK);
   useStore(MATCH_SCORE);
 
-  const toggleSport = id => setSports(p=>p.includes(id)?p.filter(x=>x!==id):[...p,id]);
-  const save = () => { onUpdate({...user,name,bio,sports,level}); setEditing(false); };
+  const save = () => { onUpdate({...user,name,bio,level}); setEditing(false); };
+  const toggleProfileSport = id => {
+    const cur = user.sports||[];
+    onUpdate({...user, sports: cur.includes(id) ? cur.filter(x=>x!==id) : [...cur,id]});
+  };
   const handleAvatar = e => {
     const f=e.target.files[0]; if(!f) return;
     const r=new FileReader(); r.onload=ev=>onUpdate({...user,avatar:ev.target.result}); r.readAsDataURL(f);
@@ -4425,6 +4440,26 @@ function ProfileView({ user, onLogout, onUpdate, onGoSupport, onGoAdmin }) {
           );
         })()}
 
+        {/* Mes sports */}
+        <div style={{background:C.card,border:`1px solid ${C.border}`,borderRadius:14,padding:14,marginBottom:16}}>
+          <div style={{fontSize:10,fontWeight:700,color:C.sub,textTransform:"uppercase",letterSpacing:1.5,marginBottom:12}}>🏅 {t('profile.my_sports')}</div>
+          <div style={{display:"flex",gap:7,flexWrap:"wrap"}}>
+            {SPORTS.map(s=>{
+              const active=(user.sports||[]).includes(s.id);
+              return (
+                <button key={s.id} onClick={()=>toggleProfileSport(s.id)}
+                  style={{padding:"7px 12px",borderRadius:9,cursor:"pointer",fontFamily:C.font,fontWeight:600,fontSize:12,
+                    background:active?`${s.color}20`:C.card2,
+                    border:`1px solid ${active?s.color:C.border}`,
+                    color:active?s.color:C.sub,
+                    display:"flex",alignItems:"center",gap:5,transition:"all .15s"}}>
+                  <SportEmoji sport={s} size={13}/> {s.label}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+
         {/* Language selector */}
         <div style={{background:C.card,border:`1px solid ${C.border}`,borderRadius:14,padding:14,marginBottom:16}}>
           <div style={{fontSize:10,fontWeight:700,color:C.sub,textTransform:"uppercase",letterSpacing:1.5,marginBottom:12}}>🌐 {t('profile.language_title')}</div>
@@ -4469,14 +4504,6 @@ function ProfileView({ user, onLogout, onUpdate, onGoSupport, onGoAdmin }) {
 
         {editing && (
           <div style={{background:C.card,border:`1px solid ${C.border}`,borderRadius:14,padding:14}}>
-            <div style={{fontSize:10,fontWeight:700,color:C.sub,textTransform:"uppercase",letterSpacing:1.5,marginBottom:10}}>{t('auth.sports')}</div>
-            <div style={{display:"flex",gap:7,flexWrap:"wrap",marginBottom:14}}>
-              {SPORTS.map(s=>(
-                <button key={s.id} onClick={()=>toggleSport(s.id)} style={{padding:"7px 12px",borderRadius:9,cursor:"pointer",fontFamily:C.font,fontWeight:600,fontSize:12,background:sports.includes(s.id)?`${s.color}20`:C.card2,border:`1px solid ${sports.includes(s.id)?s.color:C.border}`,color:sports.includes(s.id)?s.color:C.sub,display:"flex",alignItems:"center",gap:5}}>
-                  <SportEmoji sport={s} size={13}/> {s.label}
-                </button>
-              ))}
-            </div>
             <div style={{fontSize:10,fontWeight:700,color:C.sub,textTransform:"uppercase",letterSpacing:1.5,marginBottom:10}}>{t('auth.level')}</div>
             <div style={{display:"flex",gap:7,flexWrap:"wrap"}}>
               {LEVELS.map(l=><Chip key={l} active={level===l} onClick={()=>setLevel(l)} color={C.purple}>{l}</Chip>)}

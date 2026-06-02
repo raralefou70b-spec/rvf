@@ -211,6 +211,8 @@ const resources = {
       win_pct:"% victoires",
       fields_visited_one:"terrain visité",
       fields_visited_other:"terrains visités",
+      my_sports:"Mes sports",
+      see_all_sports:"Voir tous les sports",
     },
     social: {
       title:"Amis & Joueurs",
@@ -554,6 +556,8 @@ const resources = {
       win_pct:"% wins",
       fields_visited_one:"field visited",
       fields_visited_other:"fields visited",
+      my_sports:"My sports",
+      see_all_sports:"See all sports",
     },
     social: {
       title:"Friends & Players",
@@ -885,6 +889,8 @@ const resources = {
       win_pct:"% victorias",
       fields_visited_one:"cancha visitada",
       fields_visited_other:"canchas visitadas",
+      my_sports:"Mis deportes",
+      see_all_sports:"Ver todos los deportes",
     },
     social: {
       title:"Amigos y Jugadores",
@@ -1113,6 +1119,8 @@ const resources = {
       admin_title:"Painel Admin", admin_sub:"Relatórios, manutenção, bloqueios",
       history_section:"Histórico", win_pct:"% vitórias",
       fields_visited_one:"campo visitado", fields_visited_other:"campos visitados",
+      my_sports:"Meus esportes",
+      see_all_sports:"Ver todos os esportes",
     },
     social: {
       title:"Amigos e Jogadores", search:"Buscar jogador…",
@@ -1307,6 +1315,8 @@ const resources = {
       admin_title:"لوحة الإدارة", admin_sub:"التقارير، الصيانة، الحظر",
       history_section:"السجل", win_pct:"% انتصارات",
       fields_visited_one:"ملعب مُزار", fields_visited_other:"ملاعب مُزارة",
+      my_sports:"رياضاتي",
+      see_all_sports:"عرض كل الرياضات",
     },
     social: {
       title:"الأصدقاء واللاعبون", search:"البحث عن لاعب...",
@@ -1501,6 +1511,8 @@ const resources = {
       admin_title:"管理面板", admin_sub:"报告、维护、封禁",
       history_section:"历史", win_pct:"% 胜率",
       fields_visited_one:"个场地", fields_visited_other:"个场地",
+      my_sports:"我的运动",
+      see_all_sports:"查看所有运动",
     },
     social: {
       title:"朋友与球员", search:"搜索球员...",
@@ -1695,6 +1707,8 @@ const resources = {
       admin_title:"एडमिन पैनल", admin_sub:"रिपोर्ट, रखरखाव, प्रतिबंध",
       history_section:"इतिहास", win_pct:"% जीत",
       fields_visited_one:"मैदान", fields_visited_other:"मैदान",
+      my_sports:"मेरे खेल",
+      see_all_sports:"सभी खेल देखें",
     },
     social: {
       title:"मित्र और खिलाड़ी", search:"खिलाड़ी खोजें...",
@@ -1889,6 +1903,8 @@ const resources = {
       admin_title:"Admin-Panel", admin_sub:"Berichte, Wartung, Sperren",
       history_section:"Verlauf", win_pct:"% Siege",
       fields_visited_one:"Platz besucht", fields_visited_other:"Plätze besucht",
+      my_sports:"Meine Sportarten",
+      see_all_sports:"Alle Sportarten anzeigen",
     },
     social: {
       title:"Freunde & Spieler", search:"Spieler suchen…",
@@ -2083,6 +2099,8 @@ const resources = {
       admin_title:"Pannello Admin", admin_sub:"Segnalazioni, manutenzione, blocchi",
       history_section:"Storico", win_pct:"% vittorie",
       fields_visited_one:"campo visitato", fields_visited_other:"campi visitati",
+      my_sports:"I miei sport",
+      see_all_sports:"Vedi tutti gli sport",
     },
     social: {
       title:"Amici e Giocatori", search:"Cerca un giocatore…",
@@ -2277,6 +2295,8 @@ const resources = {
       admin_title:"Панель администратора", admin_sub:"Жалобы, обслуживание, блокировки",
       history_section:"История", win_pct:"% побед",
       fields_visited_one:"поле посещено", fields_visited_other:"полей посещено",
+      my_sports:"Мои виды спорта",
+      see_all_sports:"Показать все виды спорта",
     },
     social: {
       title:"Друзья и Игроки", search:"Поиск игрока…",
@@ -2471,6 +2491,8 @@ const resources = {
       admin_title:"管理パネル", admin_sub:"報告、メンテナンス、制限",
       history_section:"履歴", win_pct:"% 勝率",
       fields_visited_one:"グラウンド訪問", fields_visited_other:"グラウンド訪問",
+      my_sports:"マイスポーツ",
+      see_all_sports:"全スポーツを表示",
     },
     social: {
       title:"友達とプレーヤー", search:"プレーヤーを検索...",
@@ -2665,6 +2687,8 @@ const resources = {
       admin_title:"관리자 패널", admin_sub:"신고, 유지관리, 차단",
       history_section:"기록", win_pct:"% 승률",
       fields_visited_one:"경기장 방문", fields_visited_other:"경기장 방문",
+      my_sports:"내 스포츠",
+      see_all_sports:"모든 스포츠 보기",
     },
     social: {
       title:"친구 및 선수", search:"선수 검색...",
