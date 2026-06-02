@@ -55,6 +55,11 @@ const SPORTS = [
 const LEVELS = ["Débutant","Amateur","Intermédiaire","Confirmé","Expert"];
 const DAYS   = ["Lun","Mar","Mer","Jeu","Ven","Sam","Dim"];
 const HOURS  = ["08h","10h","12h","14h","16h","18h","20h","22h"];
+const SURF_KEYS = {
+  "Gazon naturel":"gazon_naturel", "Gazon synthétique":"gazon_synthetique",
+  "Terre battue":"terre_battue", "Béton":"beton", "Parquet":"parquet",
+  "Sable":"sable", "Moquette":"moquette", "Dur":"dur", "Gazon":"gazon",
+};
 
 const TERRAINS = [
   // ── Europe – Paris ────────────────────────────────────────────────────────────
@@ -1412,6 +1417,7 @@ function CityAutocomplete({ value, onChange, error, terrainCities=[] }) {
 
 // ─── ADD TERRAIN MODAL ────────────────────────────────────────────────────────
 function AddTerrainModal({ user, onAdd, onClose, initialLat, initialLng }) {
+  const {t} = useTranslation();
   const hasGPS = initialLat != null && initialLng != null;
   const [f,setF]           = useState({name:"",sports:["football"],city:"",country:"",surface:"Gazon naturel",price:"Gratuit",lights:false,free:true,phone:""});
   const [photos,setPhotos] = useState([]);
@@ -1430,10 +1436,10 @@ function AddTerrainModal({ user, onAdd, onClose, initialLat, initialLng }) {
 
   const submit = async () => {
     const e={};
-    if (!f.name.trim())      e.name="Requis";
-    if (!f.city.trim())      e.city="Requise";
-    if (!f.country.trim())   e.country="Requis";
-    if (!f.sports.length)    e.sports="Au moins un sport";
+    if (!f.name.trim())      e.name=t('common.required');
+    if (!f.city.trim())      e.city=t('common.required');
+    if (!f.country.trim())   e.country=t('common.required');
+    if (!f.sports.length)    e.sports=t('auth.sports_required');
     setErr(e);
     if (Object.keys(e).length) return;
     setSaving(true);
@@ -1459,9 +1465,9 @@ function AddTerrainModal({ user, onAdd, onClose, initialLat, initialLng }) {
       <div style={{background:C.card,border:`1px solid ${C.border}`,borderRadius:20,width:"100%",maxWidth:500,maxHeight:"90vh",display:"flex",flexDirection:"column",boxShadow:"0 30px 80px rgba(0,0,0,.8)"}}>
         <div style={{padding:"16px 20px",borderBottom:`1px solid ${C.border}`,display:"flex",justifyContent:"space-between",alignItems:"center",flexShrink:0}}>
           <div>
-            <div style={{fontFamily:C.head,fontWeight:700,fontSize:18,color:C.text}}>➕ Ajouter un terrain</div>
+            <div style={{fontFamily:C.head,fontWeight:700,fontSize:18,color:C.text}}>{t('map.add_terrain_title')}</div>
             <div style={{fontSize:11,color:hasGPS?C.accent:C.sub,marginTop:2}}>
-              {hasGPS ? "📍 Position épinglée sur la carte" : "Visible instantanément sur la carte mondiale"}
+              {hasGPS ? t('map.gps_pinned') : t('map.gps_visible')}
             </div>
           </div>
           <button onClick={onClose} style={{background:C.card2,border:`1px solid ${C.border}`,borderRadius:8,width:32,height:32,cursor:"pointer",color:C.sub,fontSize:18}}>✕</button>
@@ -1470,15 +1476,15 @@ function AddTerrainModal({ user, onAdd, onClose, initialLat, initialLng }) {
         {done ? (
           <div style={{flex:1,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",gap:12,padding:32,textAlign:"center"}}>
             <div style={{fontSize:52}}>🎉</div>
-            <div style={{fontFamily:C.head,fontWeight:700,fontSize:22,color:C.accent}}>Terrain ajouté !</div>
-            <div style={{fontSize:13,color:C.sub}}>"{f.name}" est maintenant visible sur la carte.</div>
+            <div style={{fontFamily:C.head,fontWeight:700,fontSize:22,color:C.accent}}>{t('add_terrain.success_title')}</div>
+            <div style={{fontSize:13,color:C.sub}}>"{f.name}" {t('add_terrain.success_sub')}</div>
           </div>
         ) : (
           <div style={{flex:1,overflowY:"auto",padding:20,display:"flex",flexDirection:"column",gap:14}}>
             {/* Sport */}
             <div>
               <label style={{fontSize:11,fontWeight:700,color:err.sports?C.red:C.sub,textTransform:"uppercase",letterSpacing:1,display:"block",marginBottom:6}}>
-                Sports disponibles * {f.sports.length>0&&<span style={{color:C.accent,fontWeight:700,fontSize:11}}>({f.sports.length} sélectionné{f.sports.length>1?"s":""})</span>}
+                {t('add_terrain.sport')} {f.sports.length>0&&<span style={{color:C.accent,fontWeight:700,fontSize:11}}>({f.sports.length} {t('add_terrain.sport_selected', {count: f.sports.length})})</span>}
               </label>
               {err.sports&&<div style={{fontSize:11,color:C.red,marginBottom:6}}>{err.sports}</div>}
               <div style={{display:"flex",flexWrap:"wrap",gap:7}}>
@@ -1494,34 +1500,34 @@ function AddTerrainModal({ user, onAdd, onClose, initialLat, initialLng }) {
                 })}
               </div>
             </div>
-            <Field label="Nom du terrain *" value={f.name} onChange={e=>set("name",e.target.value)} placeholder="Ex: Court municipal Jean Bouin" error={err.name} icon="🏟️"/>
+            <Field label={t('add_terrain.name')} value={f.name} onChange={e=>set("name",e.target.value)} placeholder={t('add_terrain.name_placeholder')} error={err.name} icon="🏟️"/>
             {hasGPS && (
               <div style={{background:"rgba(0,229,160,.08)",border:"1px solid rgba(0,229,160,.3)",borderRadius:10,padding:"10px 14px",display:"flex",gap:10,alignItems:"center"}}>
                 <span style={{fontSize:18}}>📍</span>
                 <div style={{flex:1}}>
-                  <div style={{fontSize:11,fontWeight:700,color:C.accent}}>Coordonnées GPS épinglées</div>
+                  <div style={{fontSize:11,fontWeight:700,color:C.accent}}>{t('add_terrain.coords_pinned')}</div>
                   <div style={{fontSize:11,color:C.sub,marginTop:1,fontFamily:"monospace"}}>{initialLat.toFixed(5)}°, {initialLng.toFixed(5)}°</div>
                 </div>
                 <span style={{background:C.aLow,color:C.accent,borderRadius:5,padding:"2px 7px",fontSize:9,fontWeight:700,letterSpacing:.5}}>AUTO</span>
               </div>
             )}
             <CityAutocomplete value={f.city} onChange={v=>set("city",v)} error={err.city} terrainCities={TERRAINS.map(t=>t.city).filter(Boolean)}/>
-            <Field label="Pays *" value={f.country} onChange={e=>set("country",e.target.value)} placeholder="France" error={err.country} icon="🌍"/>
+            <Field label={t('add_terrain.country')} value={f.country} onChange={e=>set("country",e.target.value)} placeholder="France" error={err.country} icon="🌍"/>
             {/* Surface */}
             <div>
-              <label style={{fontSize:11,fontWeight:700,color:C.sub,textTransform:"uppercase",letterSpacing:1,display:"block",marginBottom:8}}>Surface</label>
+              <label style={{fontSize:11,fontWeight:700,color:C.sub,textTransform:"uppercase",letterSpacing:1,display:"block",marginBottom:8}}>{t('add_terrain.surface')}</label>
               <div style={{display:"flex",flexWrap:"wrap",gap:6}}>
                 {SURFS.map(s=>(
                   <button key={s} onClick={()=>set("surface",s)} style={{padding:"4px 10px",borderRadius:6,cursor:"pointer",fontFamily:C.font,fontSize:11,fontWeight:600,background:f.surface===s?C.aLow:C.card2,border:`1px solid ${f.surface===s?C.accent+"80":C.border}`,color:f.surface===s?C.accent:C.sub}}>
-                    {s}
+                    {t('surfaces.'+(SURF_KEYS[s]||s))}
                   </button>
                 ))}
               </div>
             </div>
-            <Field label="Tarif" value={f.price} onChange={e=>set("price",e.target.value)} placeholder="Gratuit ou 10€/h" icon="💰"/>
-            <Field label="Téléphone" value={f.phone} onChange={e=>set("phone",e.target.value)} placeholder="+33 1 23 45 67 89" icon="📞"/>
+            <Field label={t('add_terrain.price')} value={f.price} onChange={e=>set("price",e.target.value)} placeholder={t('add_terrain.price_placeholder')} icon="💰"/>
+            <Field label={t('add_terrain.phone')} value={f.phone} onChange={e=>set("phone",e.target.value)} placeholder="+33 1 23 45 67 89" icon="📞"/>
             <div style={{display:"flex",gap:10}}>
-              {[["lights","💡 Éclairé",C.yellow],["free","✅ Gratuit",C.accent]].map(([k,l,col])=>(
+              {[["lights",t('add_terrain.lit'),C.yellow],["free",t('add_terrain.free_toggle'),C.accent]].map(([k,l,col])=>(
                 <button key={k} onClick={()=>set(k,!f[k])} style={{flex:1,padding:"10px",borderRadius:10,cursor:"pointer",fontFamily:C.font,fontWeight:600,fontSize:12,background:f[k]?`${col}18`:C.card2,border:`2px solid ${f[k]?col:C.border}`,color:f[k]?col:C.sub}}>
                   {l}
                 </button>
@@ -1529,7 +1535,7 @@ function AddTerrainModal({ user, onAdd, onClose, initialLat, initialLng }) {
             </div>
             {/* Photos */}
             <div>
-              <label style={{fontSize:11,fontWeight:700,color:C.sub,textTransform:"uppercase",letterSpacing:1,display:"block",marginBottom:8}}>Photos</label>
+              <label style={{fontSize:11,fontWeight:700,color:C.sub,textTransform:"uppercase",letterSpacing:1,display:"block",marginBottom:8}}>{t('add_terrain.photos')}</label>
               <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:8}}>
                 {photos.map((src,i)=>(
                   <div key={i} style={{borderRadius:8,overflow:"hidden",aspectRatio:"1",border:`1px solid ${C.border}`,position:"relative"}}>
@@ -1539,7 +1545,7 @@ function AddTerrainModal({ user, onAdd, onClose, initialLat, initialLng }) {
                 ))}
                 {photos.length<6 && (
                   <div onClick={()=>fileRef.current.click()} style={{borderRadius:8,aspectRatio:"1",border:`2px dashed ${C.accent}55`,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",cursor:"pointer",color:C.accent,gap:4,background:C.aLow}}>
-                    <span style={{fontSize:22}}>📸</span><span style={{fontSize:10,fontWeight:700}}>Ajouter</span>
+                    <span style={{fontSize:22}}>📸</span><span style={{fontSize:10,fontWeight:700}}>{t('add_terrain.add_photo')}</span>
                   </div>
                 )}
               </div>
@@ -1547,16 +1553,16 @@ function AddTerrainModal({ user, onAdd, onClose, initialLat, initialLng }) {
             </div>
             {/* Preview */}
             <div style={{background:C.card2,borderRadius:10,padding:12,borderLeft:`3px solid ${primarySp?.color||C.accent}`}}>
-              <div style={{fontSize:10,color:primarySp?.color||C.accent,fontWeight:700,textTransform:"uppercase",letterSpacing:1,marginBottom:4}}>Aperçu</div>
-              <div style={{fontSize:14,fontWeight:700,color:C.text,marginBottom:4}}>{f.name||"Nom du terrain"}</div>
-              <div style={{fontSize:11,color:C.sub,marginBottom:6}}>📍 {[f.city,f.country].filter(Boolean).join(", ")||"Localisation"} · {f.price}</div>
+              <div style={{fontSize:10,color:primarySp?.color||C.accent,fontWeight:700,textTransform:"uppercase",letterSpacing:1,marginBottom:4}}>{t('add_terrain.preview')}</div>
+              <div style={{fontSize:14,fontWeight:700,color:C.text,marginBottom:4}}>{f.name||t('add_terrain.name_preview')}</div>
+              <div style={{fontSize:11,color:C.sub,marginBottom:6}}>📍 {[f.city,f.country].filter(Boolean).join(", ")||t('add_terrain.location_preview')} · {f.price}</div>
               {f.sports.length>0&&(
                 <div style={{display:"flex",gap:5,flexWrap:"wrap"}}>
                   {f.sports.map(id=>{const s=SPORTS.find(x=>x.id===id);return s?<span key={id} style={{display:"inline-flex",alignItems:"center",gap:3,background:`${s.color}18`,border:`1px solid ${s.color}50`,borderRadius:6,padding:"2px 7px",fontSize:10,fontWeight:700,color:s.color}}><SportEmoji sport={s} size={10}/> {s.label}</span>:null;})}
                 </div>
               )}
             </div>
-            <Btn onClick={submit} loading={saving} variant="solid" style={{fontSize:15,padding:"14px"}}>🚀 Publier le terrain</Btn>
+            <Btn onClick={submit} loading={saving} variant="solid" style={{fontSize:15,padding:"14px"}}>🚀 {t('add_terrain.publish')}</Btn>
           </div>
         )}
       </div>
@@ -1566,6 +1572,7 @@ function AddTerrainModal({ user, onAdd, onClose, initialLat, initialLng }) {
 
 // ─── INTERACTIVE MAP ──────────────────────────────────────────────────────────
 function InteractiveMap({ terrains, onSelect, userPos, onMapClick, pinPos, onMapReady }) {
+  const {t: tr} = useTranslation();
   const wrapRef      = useRef(null);
   const mapRef       = useRef(null);
   const markersRef   = useRef([]);
@@ -1651,10 +1658,10 @@ function InteractiveMap({ terrains, onSelect, userPos, onMapClick, pinPos, onMap
           <div style="display:flex;gap:12px;margin-bottom:10px">
             <span style="font-size:13px;font-weight:700;color:#fcc419">⭐ ${t.rating}</span>
             <span style="font-size:13px;font-weight:700;color:#00e5a0">${t.price}</span>
-            ${t.lights ? '<span style="font-size:12px">💡 Éclairé</span>' : ""}
+            ${t.lights ? `<span style="font-size:12px">${tr('map.lit')}</span>` : ""}
           </div>
           <button id="rvfbtn-${t.id}" style="width:100%;padding:8px;background:#00e5a0;color:#06090f;border:none;border-radius:8px;font-family:'DM Sans',sans-serif;font-size:12px;font-weight:700;cursor:pointer">
-            Voir le terrain →
+            ${tr('map.see_terrain')}
           </button>
         </div>
       `, { maxWidth:240, minWidth:200 });
@@ -1756,7 +1763,7 @@ function MapView({ onSelect, terrains, user, onAddTerrain, userPos, gpsError, gp
         <div style={{display:"flex",gap:8,alignItems:"center"}}>
           {/* Search */}
           <div style={{position:"relative",flex:"1 1 0",minWidth:0}}>
-            <input value={search} onChange={e=>setSearch(e.target.value)} placeholder="Rechercher un terrain, une ville…"
+            <input value={search} onChange={e=>setSearch(e.target.value)} placeholder={tr('map.search_placeholder')}
               style={{width:"100%",background:C.card2,border:`1px solid ${search?C.accent+"55":C.border}`,borderRadius:9,padding:"8px 12px 8px 32px",color:C.text,fontSize:13,outline:"none",fontFamily:C.font}}/>
             <span style={{position:"absolute",left:10,top:"50%",transform:"translateY(-50%)",opacity:.4,fontSize:14}}>🔍</span>
             {search && <button onClick={()=>setSearch("")} style={{position:"absolute",right:8,top:"50%",transform:"translateY(-50%)",background:"none",border:"none",color:C.sub,cursor:"pointer",fontSize:13,lineHeight:1,padding:2}}>✕</button>}
@@ -1771,7 +1778,7 @@ function MapView({ onSelect, terrains, user, onAddTerrain, userPos, gpsError, gp
             ))}
           </div>
           <span style={{fontSize:12,color:C.sub,flexShrink:0,whiteSpace:"nowrap"}}>
-            <span style={{color:C.accent,fontWeight:700}}>{filtered.length}</span> terrain{filtered.length>1?"s":""}
+            <span style={{color:C.accent,fontWeight:700}}>{filtered.length}</span> {tr('map.terrains', {count: filtered.length})}
           </span>
           <button onClick={()=>setShowAdd(true)} style={{background:C.accent,border:"none",borderRadius:8,padding:"7px 12px",color:"#06090f",fontSize:12,fontWeight:700,cursor:"pointer",fontFamily:C.font,flexShrink:0}}>{tr('map.add')}</button>
           <button onClick={gpsError!==4?onRequestGps:undefined} disabled={gpsLoading||gpsError===4}
@@ -1822,7 +1829,7 @@ function MapView({ onSelect, terrains, user, onAddTerrain, userPos, gpsError, gp
         {/* City suggestions */}
         {citySuggestions.length > 0 && (
           <div style={{display:"flex",flexWrap:"wrap",gap:5,paddingTop:2}}>
-            <span style={{fontSize:10,color:C.sub,alignSelf:"center",flexShrink:0}}>📍 Villes :</span>
+            <span style={{fontSize:10,color:C.sub,alignSelf:"center",flexShrink:0}}>{tr('map.cities')}</span>
             {citySuggestions.slice(0,8).map(city=>(
               <button key={city} onClick={()=>setSearch(city)}
                 style={{padding:"3px 10px",borderRadius:20,border:`1px solid ${C.accent}44`,background:`${C.accent}10`,color:C.accent,fontSize:11,fontWeight:600,cursor:"pointer",fontFamily:C.font,whiteSpace:"nowrap"}}>
@@ -1867,7 +1874,7 @@ function MapView({ onSelect, terrains, user, onAddTerrain, userPos, gpsError, gp
                   <div style={{textAlign:"right",flexShrink:0}}>
                     <div style={{fontSize:13,color:C.yellow,fontWeight:700}}>{t.rating>0?`⭐ ${t.rating}`:"🆕"}</div>
                     <div style={{fontSize:13,color:C.accent,fontWeight:700,marginTop:4}}>{t.price}</div>
-                    <div style={{fontSize:10,color:C.sub,marginTop:2}}>{t.lights?"💡 Éclairé":""}</div>
+                    <div style={{fontSize:10,color:C.sub,marginTop:2}}>{t.lights?tr('map.lit'):""}</div>
                   </div>
                   <div style={{color:C.sub,fontSize:16,flexShrink:0}}>›</div>
                 </div>
@@ -1890,15 +1897,15 @@ function MapView({ onSelect, terrains, user, onAddTerrain, userPos, gpsError, gp
               <div style={{position:"absolute",top:"50%",left:"50%",transform:"translate(-50%,2px)",zIndex:600,pointerEvents:"none",width:20,height:6,borderRadius:"50%",background:"rgba(0,0,0,.4)"}}/>
               {/* Instruction banner */}
               <div style={{position:"absolute",top:12,left:"50%",transform:"translateX(-50%)",zIndex:700,background:"rgba(6,9,15,.93)",backdropFilter:"blur(8px)",border:`1px solid ${C.accent}55`,borderRadius:22,padding:"9px 20px",fontSize:12,color:C.accent,fontWeight:600,whiteSpace:"nowrap",pointerEvents:"none",boxShadow:"0 4px 16px rgba(0,0,0,.5)"}}>
-                Déplacez la carte · le marqueur indique votre stade
+                {tr('map.move_map')}
               </div>
               {/* Confirm / Cancel bar */}
               <div style={{position:"absolute",bottom:16,left:16,right:16,zIndex:700,display:"flex",gap:10}}>
                 <button onClick={()=>setPlacementMode(false)} style={{flex:1,padding:"14px",borderRadius:13,background:"rgba(6,9,15,.92)",border:`1px solid ${C.border}`,color:C.sub,fontSize:13,fontWeight:700,cursor:"pointer",fontFamily:C.font,backdropFilter:"blur(6px)"}}>
-                  Annuler
+                  {tr('common.cancel')}
                 </button>
                 <button onClick={confirmPlacement} style={{flex:2,padding:"14px",borderRadius:13,background:C.accent,border:"none",color:"#06090f",fontSize:14,fontWeight:800,cursor:"pointer",fontFamily:C.font,boxShadow:`0 4px 16px ${C.accent}55`}}>
-                  ✅ Confirmer la position
+                  ✅ {tr('map.confirm_position')}
                 </button>
               </div>
             </>
@@ -1906,11 +1913,11 @@ function MapView({ onSelect, terrains, user, onAddTerrain, userPos, gpsError, gp
             <>
               {/* Floating "Déposer mon stade" FAB */}
               <button onClick={enterPlacementMode} style={{position:"absolute",bottom:60,right:16,zIndex:500,background:C.accent,border:"none",borderRadius:30,padding:"12px 20px",color:"#06090f",fontSize:13,fontWeight:800,cursor:"pointer",fontFamily:C.font,boxShadow:`0 4px 24px ${C.accent}66`,display:"flex",alignItems:"center",gap:8,whiteSpace:"nowrap"}}>
-                📍 Déposer mon stade
+                📍 {tr('map.place_stadium')}
               </button>
               {!mapClickPos && (
                 <div style={{position:"absolute",bottom:16,left:"50%",transform:"translateX(-50%)",zIndex:500,background:"rgba(6,9,15,.88)",backdropFilter:"blur(8px)",border:`1px solid ${C.accent}44`,borderRadius:20,padding:"7px 16px",fontSize:11,color:C.sub,whiteSpace:"nowrap",pointerEvents:"none"}}>
-                  Ou tapez la carte pour épingler un terrain ➕
+                  {tr('map.tap_to_pin')}
                 </div>
               )}
             </>
@@ -1919,7 +1926,7 @@ function MapView({ onSelect, terrains, user, onAddTerrain, userPos, gpsError, gp
       )}
 
       {showAdd && <AddTerrainModal user={user} onAdd={handleAdd} onClose={closeAdd} initialLat={mapClickPos?.lat} initialLng={mapClickPos?.lng}/>}
-      {toast && <div style={{position:"fixed",bottom:24,left:"50%",transform:"translateX(-50%)",background:C.aLow,border:`1px solid ${C.accent}55`,borderRadius:10,padding:"9px 20px",fontSize:12,color:C.accent,fontWeight:700,backdropFilter:"blur(8px)",zIndex:999,whiteSpace:"nowrap"}}>✅ "{toast}" ajouté !</div>}
+      {toast && <div style={{position:"fixed",bottom:24,left:"50%",transform:"translateX(-50%)",background:C.aLow,border:`1px solid ${C.accent}55`,borderRadius:10,padding:"9px 20px",fontSize:12,color:C.accent,fontWeight:700,backdropFilter:"blur(8px)",zIndex:999,whiteSpace:"nowrap"}}>✅ "{toast}" {tr('map.terrain_added')}</div>}
     </div>
   );
 }
@@ -2080,6 +2087,7 @@ function ItineraryTab({ terrain, sp }) {
 }
 
 function ReservationTab({ terrain, user, sp }) {
+  const {t} = useTranslation();
   useStore(BOOK);
   const isFree = terrain.free||terrain.price==="Gratuit";
   const [step,setStep]           = useState("pick");
@@ -2163,7 +2171,7 @@ function ReservationTab({ terrain, user, sp }) {
       <div style={{background:isFree?C.aLow:"rgba(255,107,53,.1)",border:`1px solid ${isFree?C.accent+"44":"#ff6b3544"}`,borderRadius:14,padding:14,display:"flex",gap:12,alignItems:"center"}}>
         <div style={{fontSize:32}}>{isFree?"🆓":"💳"}</div>
         <div>
-          <div style={{fontSize:13,fontWeight:700,color:isFree?C.accent:C.orange}}>{isFree?"Terrain gratuit — réservation instantanée":"Terrain payant — partage de numéro requis"}</div>
+          <div style={{fontSize:13,fontWeight:700,color:isFree?C.accent:C.orange}}>{isFree?t('terrain.free_hint'):t('terrain.paying_hint')}</div>
           <div style={{fontSize:12,color:C.sub,marginTop:2}}>{terrain.price}</div>
         </div>
       </div>
@@ -2690,8 +2698,8 @@ function TerrainDetail({ terrain, onBack, user, onUpdatePhone, onDelete }) {
           </div>
           <div style={{display:"flex",gap:6,marginTop:10,flexWrap:"wrap"}}>
             <Badge label={terrain.surface} color={C.blue}/>
-            {terrain.lights&&<Badge label="💡 Éclairé" color={C.yellow}/>}
-            {terrain.free?<Badge label="🆓 Gratuit" color={C.accent}/>:<Badge label="💳 Payant" color={C.orange}/>}
+            {terrain.lights&&<Badge label={t('terrain.lit')} color={C.yellow}/>}
+            {terrain.free?<Badge label={t('terrain.free')} color={C.accent}/>:<Badge label={t('terrain.paying')} color={C.orange}/>}
             <Badge label={`👥 ${terrain.players}`} color={C.purple}/>
             {terrain.addedBy&&<Badge label={"+ "+terrain.addedBy} color={C.sub}/>}
           </div>
@@ -2701,7 +2709,7 @@ function TerrainDetail({ terrain, onBack, user, onUpdatePhone, onDelete }) {
                 style={{display:"inline-flex",alignItems:"center",gap:8,marginTop:12,background:`${C.accent}15`,border:`1px solid ${C.accent}55`,borderRadius:12,padding:"10px 18px",textDecoration:"none",cursor:"pointer",alignSelf:"flex-start"}}>
                 <span style={{fontSize:20}}>📞</span>
                 <div>
-                  <div style={{fontSize:10,color:C.accent,fontWeight:700,letterSpacing:.5}}>APPELER POUR RÉSERVER</div>
+                  <div style={{fontSize:10,color:C.accent,fontWeight:700,letterSpacing:.5}}>{t('terrain.call')}</div>
                   <div style={{fontSize:13,color:C.text,fontWeight:700,fontFamily:"monospace",marginTop:1}}>{terrain.phone}</div>
                 </div>
               </a>
@@ -2710,8 +2718,8 @@ function TerrainDetail({ terrain, onBack, user, onUpdatePhone, onDelete }) {
                 style={{display:"inline-flex",alignItems:"center",gap:8,marginTop:12,background:`${C.accent}15`,border:`1px solid ${C.accent}55`,borderRadius:12,padding:"10px 18px",cursor:"pointer",alignSelf:"flex-start",fontFamily:C.font}}>
                 <span style={{fontSize:20}}>📞</span>
                 <div style={{textAlign:"left"}}>
-                  <div style={{fontSize:10,color:C.accent,fontWeight:700,letterSpacing:.5}}>APPELER POUR RÉSERVER</div>
-                  <div style={{fontSize:11,color:C.sub,marginTop:1}}>Entrez votre numéro pour accéder</div>
+                  <div style={{fontSize:10,color:C.accent,fontWeight:700,letterSpacing:.5}}>{t('terrain.call')}</div>
+                  <div style={{fontSize:11,color:C.sub,marginTop:1}}>{t('terrain.call_hint')}</div>
                 </div>
               </button>
             )
@@ -2720,8 +2728,8 @@ function TerrainDetail({ terrain, onBack, user, onUpdatePhone, onDelete }) {
               style={{display:"inline-flex",alignItems:"center",gap:8,marginTop:12,background:C.card2,border:`1px dashed ${C.border}`,borderRadius:12,padding:"10px 18px",cursor:"pointer",alignSelf:"flex-start",fontFamily:C.font}}>
               <span style={{fontSize:20}}>📞</span>
               <div style={{textAlign:"left"}}>
-                <div style={{fontSize:10,color:C.sub,fontWeight:700,letterSpacing:.5}}>NUMÉRO MANQUANT</div>
-                <div style={{fontSize:11,color:C.accent,marginTop:1,fontWeight:600}}>+ Ajouter le numéro de l'établissement</div>
+                <div style={{fontSize:10,color:C.sub,fontWeight:700,letterSpacing:.5}}>{t('terrain.phone_missing')}</div>
+                <div style={{fontSize:11,color:C.accent,marginTop:1,fontWeight:600}}>{t('terrain.phone_add')}</div>
               </div>
             </button>
           )}
@@ -2747,7 +2755,7 @@ function TerrainDetail({ terrain, onBack, user, onUpdatePhone, onDelete }) {
           {tab==="photos"    && <PhotosTab terrain={terrain} user={user} sp={sp}/>}
           {tab==="info"      && (
             <div style={{background:C.card,border:`1px solid ${C.border}`,borderRadius:14,padding:14}}>
-              {[["🏟️ Surface",terrain.surface],["💡 Éclairage",terrain.lights?"Disponible":"Non"],["💰 Tarif",terrain.price],["⭐ Note",terrain.rating>0?terrain.rating+"/5":"Non noté"],["👥 Joueurs",terrain.players],...(terrain.phone?[["📞 Téléphone",terrain.phone]]:[])] .map(([k,v])=>(
+              {[["🏟️ "+t('terrain.surface'),t('surfaces.'+(SURF_KEYS[terrain.surface]||'gazon_naturel'))],["💡 "+t('terrain.lighting'),terrain.lights?t('terrain.available'):t('terrain.unavailable')],["💰 "+t('terrain.price_label'),terrain.price],["⭐ "+t('terrain.rating'),terrain.rating>0?terrain.rating+"/5":t('terrain.unrated')],["👥 "+t('terrain.players'),terrain.players],...(terrain.phone?[["📞 "+t('terrain.phone_label'),terrain.phone]]:[])] .map(([k,v])=>(
                 <div key={k} style={{display:"flex",justifyContent:"space-between",padding:"8px 0",borderBottom:`1px solid ${C.border}`}}>
                   <span style={{color:C.sub,fontSize:13}}>{k}</span>
                   <span style={{color:C.text,fontSize:13,fontWeight:600}}>{v}</span>
@@ -2777,8 +2785,8 @@ function TerrainDetail({ terrain, onBack, user, onUpdatePhone, onDelete }) {
       {showPhoneModal && (
         <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.75)",zIndex:1000,display:"flex",alignItems:"center",justifyContent:"center",padding:20}} onClick={()=>setShowPhoneModal(false)}>
           <div style={{background:C.card,border:`1px solid ${C.border}`,borderRadius:18,padding:24,width:"100%",maxWidth:360}} onClick={e=>e.stopPropagation()}>
-            <div style={{fontFamily:C.head,fontWeight:700,fontSize:18,color:C.text,marginBottom:8}}>📞 Réserver par téléphone</div>
-            <div style={{fontSize:13,color:C.sub,marginBottom:16,lineHeight:1.5}}>Pour obtenir le numéro de <strong style={{color:C.text}}>{terrain.name}</strong>, entrez votre numéro de téléphone.</div>
+            <div style={{fontFamily:C.head,fontWeight:700,fontSize:18,color:C.text,marginBottom:8}}>📞 {t('terrain.call_modal_title')}</div>
+            <div style={{fontSize:13,color:C.sub,marginBottom:16,lineHeight:1.5}}>{t('terrain.call_modal_sub', {name: terrain.name})}</div>
             <input
               type="tel"
               placeholder="+33 6 12 34 56 78"
@@ -2791,11 +2799,11 @@ function TerrainDetail({ terrain, onBack, user, onUpdatePhone, onDelete }) {
                 onClick={()=>{if(userPhoneInput.trim()){setPhoneRevealed(true);setShowPhoneModal(false);}}}
                 disabled={!userPhoneInput.trim()}
                 style={{flex:1,background:userPhoneInput.trim()?C.accent:"#333",border:"none",borderRadius:10,padding:"11px 0",color:userPhoneInput.trim()?"#000":C.sub,fontWeight:700,fontSize:14,cursor:userPhoneInput.trim()?"pointer":"default",fontFamily:C.font}}>
-                Confirmer
+                {t('common.confirm')}
               </button>
               <button onClick={()=>setShowPhoneModal(false)}
                 style={{flex:1,background:"transparent",border:`1px solid ${C.border}`,borderRadius:10,padding:"11px 0",color:C.sub,fontWeight:600,fontSize:14,cursor:"pointer",fontFamily:C.font}}>
-                Annuler
+                {t('common.cancel')}
               </button>
             </div>
           </div>
@@ -2805,8 +2813,8 @@ function TerrainDetail({ terrain, onBack, user, onUpdatePhone, onDelete }) {
       {showAddPhone && (
         <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.75)",zIndex:1000,display:"flex",alignItems:"center",justifyContent:"center",padding:20}} onClick={()=>setShowAddPhone(false)}>
           <div style={{background:C.card,border:`1px solid ${C.border}`,borderRadius:18,padding:24,width:"100%",maxWidth:360}} onClick={e=>e.stopPropagation()}>
-            <div style={{fontFamily:C.head,fontWeight:700,fontSize:18,color:C.text,marginBottom:4}}>📞 Ajouter le numéro</div>
-            <div style={{fontSize:13,color:C.sub,marginBottom:16,lineHeight:1.5}}>Vous connaissez le numéro de <strong style={{color:C.text}}>{terrain.name}</strong> ? Partagez-le avec la communauté !</div>
+            <div style={{fontFamily:C.head,fontWeight:700,fontSize:18,color:C.text,marginBottom:4}}>📞 {t('terrain.add_phone_title')}</div>
+            <div style={{fontSize:13,color:C.sub,marginBottom:16,lineHeight:1.5}}>{t('terrain.add_phone_sub', {name: terrain.name})}</div>
             <input
               type="tel"
               placeholder="+33 1 23 45 67 89"
@@ -2825,11 +2833,11 @@ function TerrainDetail({ terrain, onBack, user, onUpdatePhone, onDelete }) {
                 }}
                 disabled={!addPhoneVal.trim()}
                 style={{flex:1,background:addPhoneVal.trim()?C.accent:"#333",border:"none",borderRadius:10,padding:"11px 0",color:addPhoneVal.trim()?"#000":C.sub,fontWeight:700,fontSize:14,cursor:addPhoneVal.trim()?"pointer":"default",fontFamily:C.font}}>
-                Enregistrer
+                {t('common.save')}
               </button>
               <button onClick={()=>setShowAddPhone(false)}
                 style={{flex:1,background:"transparent",border:`1px solid ${C.border}`,borderRadius:10,padding:"11px 0",color:C.sub,fontWeight:600,fontSize:14,cursor:"pointer",fontFamily:C.font}}>
-                Annuler
+                {t('common.cancel')}
               </button>
             </div>
           </div>
@@ -3168,7 +3176,7 @@ function TeamsView({ user, terrains, onGoToMessages }) {
         <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:14}}>
           <div>
             <div style={{fontFamily:C.head,fontWeight:700,fontSize:26,color:C.text}}>Équipes</div>
-            <p style={{fontSize:12,color:C.sub,marginTop:2}}>Rejoignez, créez ou défiez des équipes</p>
+            <p style={{fontSize:12,color:C.sub,marginTop:2}}>{t('teams.subtitle')}</p>
           </div>
           {viewTab==="teams" && <Btn onClick={()=>setShowCreate(p=>!p)} full={false} style={{padding:"9px 16px",fontSize:12}}>+ Créer</Btn>}
         </div>
@@ -3176,15 +3184,15 @@ function TeamsView({ user, terrains, onGoToMessages }) {
         {/* Tabs */}
         <div style={{display:"flex",background:C.card,borderRadius:12,padding:4,gap:4,marginBottom:16}}>
           <button onClick={()=>setViewTab("teams")} style={{flex:1,padding:"9px",border:"none",borderRadius:9,background:viewTab==="teams"?C.accent:"transparent",color:viewTab==="teams"?"#06090f":C.sub,fontFamily:C.font,fontSize:12,fontWeight:700,cursor:"pointer",transition:"all .2s"}}>
-            👥 Équipes
+            {t('teams.tab_teams')}
           </button>
           <button onClick={()=>setViewTab("matches")} style={{flex:1,padding:"9px",border:"none",borderRadius:9,background:viewTab==="matches"?C.orange:"transparent",color:viewTab==="matches"?"#06090f":C.sub,fontFamily:C.font,fontSize:12,fontWeight:700,cursor:"pointer",transition:"all .2s",position:"relative"}}>
-            ⚔️ Matchs
+            {t('teams.tab_matches')}
             {incomingCount>0 && <span style={{position:"absolute",top:5,right:10,minWidth:16,height:16,borderRadius:8,background:C.red,color:"#fff",fontSize:10,fontWeight:800,display:"inline-flex",alignItems:"center",justifyContent:"center",padding:"0 3px"}}>{incomingCount}</span>}
           </button>
           {myTeams.length>0 && (
             <button onClick={()=>setViewTab("requests")} style={{flex:1,padding:"9px",border:"none",borderRadius:9,background:viewTab==="requests"?C.yellow:"transparent",color:viewTab==="requests"?"#06090f":C.sub,fontFamily:C.font,fontSize:12,fontWeight:700,cursor:"pointer",transition:"all .2s",position:"relative"}}>
-              🔔 Demandes
+              {t('teams.tab_requests')}
               {totalPending>0 && <span style={{position:"absolute",top:5,right:10,minWidth:16,height:16,borderRadius:8,background:C.red,color:"#fff",fontSize:10,fontWeight:800,display:"inline-flex",alignItems:"center",justifyContent:"center",padding:"0 3px"}}>{totalPending}</span>}
             </button>
           )}
@@ -3195,14 +3203,14 @@ function TeamsView({ user, terrains, onGoToMessages }) {
           <>
             {showCreate && (
               <div style={{background:C.card,border:`1px solid ${C.accent}44`,borderRadius:16,padding:18,marginBottom:18}}>
-                <div style={{fontSize:13,fontWeight:700,color:C.accent,marginBottom:12}}>🆕 Nouvelle équipe</div>
+                <div style={{fontSize:13,fontWeight:700,color:C.accent,marginBottom:12}}>🆕 {t('teams.new_team')}</div>
                 <div style={{display:"flex",flexDirection:"column",gap:10}}>
                   <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
-                    <Field value={teamName} onChange={e=>setTeamName(e.target.value)} placeholder="Nom de l'équipe" icon="👥"/>
-                    <Field value={teamCity} onChange={e=>setTeamCity(e.target.value)} placeholder="Paris, Lyon…" icon="📍"/>
+                    <Field value={teamName} onChange={e=>setTeamName(e.target.value)} placeholder={t('teams.name_placeholder')} icon="👥"/>
+                    <Field value={teamCity} onChange={e=>setTeamCity(e.target.value)} placeholder={t('teams.city_placeholder')} icon="📍"/>
                   </div>
                   <div style={{display:"flex",flexWrap:"wrap",gap:6}}>{SPORTS.map(s=><Chip key={s.id} active={teamSport===s.id} onClick={()=>setTeamSport(s.id)} color={s.color}><span style={{display:"inline-flex",alignItems:"center",gap:4}}><SportEmoji sport={s} size={12}/>{s.label}</span></Chip>)}</div>
-                  <div style={{display:"flex",flexWrap:"wrap",gap:6}}>{["Amateur","Intermédiaire","Confirmé","Senior"].map(l=><Chip key={l} active={teamLevel===l} onClick={()=>setTeamLevel(l)} color={C.purple}>{l}</Chip>)}</div>
+                  <div style={{display:"flex",flexWrap:"wrap",gap:6}}>{[["Amateur",t('teams.level_amateur')],["Intermédiaire",t('teams.level_inter')],["Confirmé",t('teams.level_confirm')],["Senior",t('teams.level_senior')]].map(([val,label])=><Chip key={val} active={teamLevel===val} onClick={()=>setTeamLevel(val)} color={C.purple}>{label}</Chip>)}</div>
                   <div style={{display:"flex",gap:8}}>
                     <Btn onClick={create} variant="solid">✅ Créer</Btn>
                     <Btn onClick={()=>setShowCreate(false)} variant="ghost">Annuler</Btn>
@@ -3282,7 +3290,7 @@ function TeamsView({ user, terrains, onGoToMessages }) {
             {/* Demandes d'adhésion inline */}
             {allPendingReqs.length>0 && (
               <div style={{marginTop:20,display:"flex",flexDirection:"column",gap:10}}>
-                <div style={{fontSize:11,fontWeight:700,color:C.yellow,textTransform:"uppercase",letterSpacing:1}}>🔔 Demandes d'adhésion</div>
+                <div style={{fontSize:11,fontWeight:700,color:C.yellow,textTransform:"uppercase",letterSpacing:1}}>{t('teams.membership_requests')}</div>
                 {allPendingReqs.map(req=>{
                   const fromUser = DB.find(u=>u.id===req.fromUserId);
                   return (
@@ -3449,8 +3457,8 @@ function TeamsView({ user, terrains, onGoToMessages }) {
             {MATCH_REQ.list.filter(r=>myTeamIds.includes(r.toTeamId)||(r.isSolo&&r.fromUserId===user?.id)||myTeamIds.includes(r.fromTeamId)).length===0 && (
               <div style={{textAlign:"center",padding:"50px 20px"}}>
                 <div style={{fontSize:48,marginBottom:12}}>⚔️</div>
-                <div style={{fontSize:16,fontWeight:700,color:C.text,marginBottom:6}}>Aucun match prévu</div>
-                <div style={{fontSize:13,color:C.sub,lineHeight:1.6}}>Défier une équipe depuis l'onglet <strong style={{color:C.accent}}>Équipes</strong> pour organiser un match amical.</div>
+                <div style={{fontSize:16,fontWeight:700,color:C.text,marginBottom:6}}>{t('teams.no_matches')}</div>
+                <div style={{fontSize:13,color:C.sub,lineHeight:1.6}}>{t('teams.no_matches_sub')}</div>
               </div>
             )}
           </div>
@@ -3460,15 +3468,15 @@ function TeamsView({ user, terrains, onGoToMessages }) {
         {viewTab==="requests" && (
           <div style={{display:"flex",flexDirection:"column",gap:12}}>
             <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:4}}>
-              <div style={{fontSize:11,fontWeight:700,color:C.yellow,textTransform:"uppercase",letterSpacing:1}}>🔔 Demandes d'adhésion</div>
+              <div style={{fontSize:11,fontWeight:700,color:C.yellow,textTransform:"uppercase",letterSpacing:1}}>{t('teams.membership_requests')}</div>
               {totalPending>0 && <span style={{background:`${C.yellow}20`,color:C.yellow,border:`1px solid ${C.yellow}40`,borderRadius:8,padding:"2px 8px",fontSize:11,fontWeight:700}}>{totalPending} en attente</span>}
             </div>
 
             {allPendingReqs.length===0 ? (
               <div style={{textAlign:"center",padding:"60px 20px"}}>
                 <div style={{fontSize:48,marginBottom:12}}>👥</div>
-                <div style={{fontSize:16,fontWeight:700,color:C.text,marginBottom:6}}>Aucune demande</div>
-                <div style={{fontSize:13,color:C.sub}}>Les nouvelles demandes d'adhésion apparaîtront ici.</div>
+                <div style={{fontSize:16,fontWeight:700,color:C.text,marginBottom:6}}>{t('teams.no_requests')}</div>
+                <div style={{fontSize:13,color:C.sub}}>{t('teams.no_requests_sub')}</div>
               </div>
             ) : allPendingReqs.map(req=>{
               const fromUser = DB.find(u=>u.id===req.fromUserId);
@@ -3832,10 +3840,10 @@ function SocialView({ user, terrains, onGoToMessages }) {
             {friendList.length===0 ? (
               <div style={{textAlign:"center",padding:"50px 20px"}}>
                 <div style={{fontSize:48,marginBottom:12}}>👥</div>
-                <div style={{fontSize:16,fontWeight:700,color:C.text,marginBottom:6}}>Aucun ami pour l'instant</div>
-                <div style={{fontSize:13,color:C.sub,lineHeight:1.6,marginBottom:20}}>Cherche des joueurs dans l'onglet<br/><strong style={{color:C.accent}}>Rechercher</strong> et ajoute-les en ami</div>
+                <div style={{fontSize:16,fontWeight:700,color:C.text,marginBottom:6}}>{t('social.no_friends')}</div>
+                <div style={{fontSize:13,color:C.sub,lineHeight:1.6,marginBottom:20}}>{t('social.empty_hint')}</div>
                 <button onClick={()=>setTab("search")} style={{background:C.accent,border:"none",borderRadius:10,padding:"11px 24px",color:"#06090f",fontSize:13,fontWeight:700,cursor:"pointer",fontFamily:C.font}}>
-                  🔍 Trouver des joueurs
+                  🔍 {t('social.find_btn')}
                 </button>
               </div>
             ) : (
@@ -3971,8 +3979,8 @@ function SocialView({ user, terrains, onGoToMessages }) {
 
         {tab==="qr" && (
           <div style={{textAlign:"center",padding:"20px 0"}}>
-            <div style={{fontFamily:C.head,fontWeight:700,fontSize:20,color:C.text,marginBottom:6}}>Mon QR Code</div>
-            <div style={{fontSize:13,color:C.sub,marginBottom:22,lineHeight:1.6}}>Fais scanner ce code par un ami<br/>pour qu'il puisse te retrouver</div>
+            <div style={{fontFamily:C.head,fontWeight:700,fontSize:20,color:C.text,marginBottom:6}}>{t('social.qr_title')}</div>
+            <div style={{fontSize:13,color:C.sub,marginBottom:22,lineHeight:1.6}}>{t('social.qr_sub')}</div>
             <div style={{background:C.card,border:`1px solid ${C.border}`,borderRadius:20,padding:24,display:"inline-block",marginBottom:16}}>
               <img src={qrUrl} alt="QR Code" style={{width:200,height:200,borderRadius:8,display:"block"}}/>
             </div>
@@ -3991,6 +3999,7 @@ function SocialView({ user, terrains, onGoToMessages }) {
 
 // ─── MESSAGING VIEW ───────────────────────────────────────────────────────────
 function MessagingView({ user, openWith }) {
+  const {t} = useTranslation();
   useStore(CHAT);
   useStore(FRIENDS);
   const [sel,setSel]           = useState(null);
@@ -4021,7 +4030,7 @@ function MessagingView({ user, openWith }) {
   useEffect(()=>{ msgEndRef.current?.scrollIntoView({behavior:"smooth"}); },[selConv.length]);
   useEffect(()=>{ if(sel) CHAT.markRead(sel,user.name); },[sel,selConv.length]);
 
-  const REPLIES = ["Super idée ! 🔥","Je suis partant !","À quelle heure ?","OK 👍","À tout à l'heure !","Tu peux inviter d'autres joueurs ?"];
+  const REPLIES = [t('messages.quick_reply_1'),t('messages.quick_reply_2'),t('messages.quick_reply_3'),t('messages.quick_reply_4'),t('messages.quick_reply_5'),t('messages.quick_reply_6')];
   const simulateReply = useCallback(from => {
     setTimeout(()=>CHAT.send(from,user.name,REPLIES[Math.floor(Math.random()*REPLIES.length)]), 2000+Math.random()*2000);
   },[user.name]);
@@ -4058,12 +4067,12 @@ function MessagingView({ user, openWith }) {
           const filtered = q ? allPlayers.filter(p=>p.name.toLowerCase().includes(q)) : allPlayers;
           return (
             <div style={{padding:12,borderBottom:`1px solid ${C.border}`,background:C.card2}}>
-              <div style={{fontSize:11,color:C.sub,fontWeight:700,marginBottom:8,textTransform:"uppercase",letterSpacing:1}}>Nouveau message</div>
+              <div style={{fontSize:11,color:C.sub,fontWeight:700,marginBottom:8,textTransform:"uppercase",letterSpacing:1}}>{t('messages.new_conv')}</div>
               <input value={newTo} onChange={e=>setNewTo(e.target.value)} placeholder="Rechercher un joueur…"
                 style={{width:"100%",background:C.card,border:`1px solid ${C.border}`,borderRadius:8,padding:"7px 10px",color:C.text,fontSize:12,outline:"none",fontFamily:C.font,boxSizing:"border-box",marginBottom:8}}/>
               <div style={{display:"flex",flexDirection:"column",gap:4,maxHeight:180,overflowY:"auto"}}>
                 {filtered.length===0
-                  ? <div style={{fontSize:12,color:C.sub,textAlign:"center",padding:"12px 0"}}>Aucun joueur trouvé</div>
+                  ? <div style={{fontSize:12,color:C.sub,textAlign:"center",padding:"12px 0"}}>{t('messages.no_player_found')}</div>
                   : filtered.map(p=>(
                     <button key={p.name} onClick={()=>openConvWith(p.name)}
                       style={{display:"flex",alignItems:"center",gap:9,padding:"7px 10px",borderRadius:9,cursor:"pointer",fontFamily:C.font,background:C.card,border:`1px solid ${C.border}`,color:C.text,textAlign:"left",width:"100%"}}>
@@ -4083,7 +4092,7 @@ function MessagingView({ user, openWith }) {
 
         <div style={{flex:1,overflowY:"auto"}}>
           {convs.length===0
-            ? <div style={{padding:20,textAlign:"center",color:C.sub,fontSize:13}}><div style={{fontSize:32,marginBottom:8}}>💬</div>Aucune conversation.<br/>Cliquez + pour commencer.</div>
+            ? <div style={{padding:20,textAlign:"center",color:C.sub,fontSize:13}}><div style={{fontSize:32,marginBottom:8}}>💬</div>{t('messages.no_conversations')}</div>
             : convs.map(conv=>(
                 <div key={conv.id} onClick={()=>selectConv(conv.id)}
                   style={{padding:"11px 14px",borderBottom:`1px solid ${C.border}`,cursor:"pointer",background:sel===conv.id?C.aLow:C.card,borderLeft:`3px solid ${sel===conv.id?C.accent:"transparent"}`}}>
@@ -4123,7 +4132,7 @@ function MessagingView({ user, openWith }) {
               </div>
               <div style={{display:"flex",alignItems:"center",gap:6}}>
                 <div style={{width:7,height:7,borderRadius:"50%",background:C.green,boxShadow:`0 0 6px ${C.green}`}}/>
-                <span style={{fontSize:11,color:C.sub}}>En ligne</span>
+                <span style={{fontSize:11,color:C.sub}}>{t('messages.online')}</span>
               </div>
             </div>
           </div>
@@ -4132,7 +4141,7 @@ function MessagingView({ user, openWith }) {
             {selConv.length===0 && (
               <div style={{textAlign:"center",color:C.sub,fontSize:13,marginTop:40}}>
                 <div style={{fontSize:40,marginBottom:8}}>👋</div>
-                Commencez la conversation avec {selOther}
+                {t('messages.start_conv', {name: selOther})}
               </div>
             )}
             {selConv.map(msg=>{
@@ -4878,7 +4887,7 @@ function InvitesPanel({ user, onClose }) {
                           <Avatar name={r.fromUserName} size={42} color={C.orange} photo={fromUser?.avatar}/>
                           <div style={{flex:1,minWidth:0}}>
                             <div style={{fontSize:11,fontWeight:700,color:C.orange,marginBottom:3}}>⚔️ DÉFI D'AMI</div>
-                            <div style={{fontSize:13,fontWeight:700,color:C.text}}>{r.fromUserName} <span style={{color:C.sub,fontWeight:400}}>te défie</span></div>
+                            <div style={{fontSize:13,fontWeight:700,color:C.text}}>{r.fromUserName} <span style={{color:C.sub,fontWeight:400}}>{t('invites.challenges_from')}</span></div>
                             {s&&<div style={{display:"flex",alignItems:"center",gap:5,marginTop:3}}><SportEmoji sport={s} size={13}/><span style={{fontSize:12,color:s.color,fontWeight:700}}>{s.label}</span></div>}
                             {r.terrainName&&<div style={{fontSize:12,fontWeight:700,color:C.text,marginTop:2}}>🏟️ {r.terrainName}{r.terrainCity?<span style={{color:C.accent,fontWeight:400}}> · {r.terrainCity}</span>:""}</div>}
                             <div style={{fontSize:12,color:C.sub,marginTop:1}}>📅 {r.day} · {r.hour}</div>
@@ -4927,7 +4936,7 @@ function InvitesPanel({ user, onClose }) {
 
           {tab==="team" && (
             allTeamReqs.length===0
-              ? <div style={{textAlign:"center",padding:32,color:C.sub,fontSize:13}}><div style={{fontSize:40,marginBottom:8}}>👥</div>Aucune demande d'équipe.</div>
+              ? <div style={{textAlign:"center",padding:32,color:C.sub,fontSize:13}}><div style={{fontSize:40,marginBottom:8}}>👥</div>{t('invites.no_teams')}</div>
               : allTeamReqs.map(req=>{
                   const fromUser = DB.find(u=>u.id===req.fromUserId);
                   const isPending = req.status==="pending";
