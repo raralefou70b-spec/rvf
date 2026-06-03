@@ -4182,8 +4182,18 @@ function MessagingView({ user, openWith }) {
     if (!teamMsg.trim()||!selTeam) return;
     const text = teamMsg.trim();
     setTeamMsg("");
-    TEAM_CHAT.send(selTeam, user.id, user.name, text);
-    await supabase.from('team_messages').insert({ team_id:selTeam, user_id:user.id, user_name:user.name, content:text });
+    // Insert first to get the real UUID, then add locally with that id.
+    // This ensures the Realtime dedup (find by id) works correctly.
+    const { data } = await supabase
+      .from('team_messages')
+      .insert({ team_id:selTeam, user_id:user.id, user_name:user.name, content:text })
+      .select()
+      .single();
+    if (data) {
+      const nm = { id:data.id, userId:data.user_id, from:data.user_name, text:data.content, ts:data.created_at };
+      const ex = TEAM_CHAT.byTeam[selTeam] || [];
+      if (!ex.find(x=>x.id===nm.id)) { TEAM_CHAT.byTeam[selTeam] = [...ex, nm]; TEAM_CHAT.notify(); }
+    }
   };
 
   const openConvWith = name => {
