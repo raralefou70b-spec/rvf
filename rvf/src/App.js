@@ -378,6 +378,42 @@ const REFERRAL_LEVELS = [
 const getReferralLevel = count => [...REFERRAL_LEVELS].reverse().find(l=>count>=l.min) || REFERRAL_LEVELS[0];
 const makeReferralCode  = name  => (name.replace(/\s+/g,"").toUpperCase().slice(0,6)+Math.floor(1000+Math.random()*9000));
 
+// ── XP / LEVEL SYSTEM ─────────────────────────────────────────────────────────
+const XP_LEVELS = (() => {
+  const tbl=[0,100,300,600,1000,1500,2000,2700,3500,4500,5500,6600,7800,9100,10500,12000,13600,15300,17100,19000];
+  const lvs=tbl.map((xp,i)=>({level:i+1,xp}));
+  for(let i=20;i<50;i++) lvs.push({level:i+1,xp:19000+(i-19)*2000});
+  return lvs;
+})();
+const getXpLevel = xp => [...XP_LEVELS].reverse().find(l=>xp>=l.xp)||XP_LEVELS[0];
+const XP_REWARDS = { terrain:50, visit:20, match:30, referral:100 };
+
+// ── SPECIALIZED BADGES ────────────────────────────────────────────────────────
+const BADGE_DEFS = [
+  { id:"builder",    emoji:"🏗️", name:"Bâtisseur",  desc:"Créer des terrains",     tiers:[{min:5,medal:"🥉",label:"Bronze"},{min:15,medal:"🥈",label:"Argent"},{min:30,medal:"🥇",label:"Or"}],    stat:u=>u.terrains||0 },
+  { id:"explorer",   emoji:"🌍", name:"Explorateur", desc:"Visiter plusieurs villes", tiers:[{min:5,medal:"🥉",label:"Bronze"},{min:15,medal:"🥈",label:"Argent"},{min:30,medal:"🥇",label:"Or"}],    stat:u=>u.citiesVisited||0 },
+  { id:"competitor", emoji:"⚽", name:"Compétiteur", desc:"Jouer des matchs",         tiers:[{min:10,medal:"🥉",label:"Bronze"},{min:30,medal:"🥈",label:"Argent"},{min:75,medal:"🥇",label:"Or"}],   stat:u=>u.matchs||0 },
+  { id:"recruiter",  emoji:"🤝", name:"Recruteur",   desc:"Parrainer des amis",       tiers:[{min:3,medal:"🥉",label:"Bronze"},{min:10,medal:"🥈",label:"Argent"},{min:25,medal:"🥇",label:"Or"}],    stat:u=>u.referralCount||0 },
+];
+const getBadgeTier   = (def,u) => { let t=null; for(const x of def.tiers){if(def.stat(u)>=x.min)t=x;} return t; };
+const getUserBadges  = u => BADGE_DEFS.map(d=>({def:d,tier:getBadgeTier(d,u)}));
+const getEarnedBadges = u => getUserBadges(u).filter(x=>x.tier);
+const getUserTopBadge = u => { const bs=getEarnedBadges(u); return bs.length?bs[bs.length-1].tier.medal:""; };
+
+// ── NAME COLORS ───────────────────────────────────────────────────────────────
+const NAME_COLORS = [
+  {id:"default", label:"Défaut",      value:null,       minLevel:1,  special:null},
+  {id:"silver",  label:"Argent",      value:"#A8B5C8",  minLevel:1,  special:null},
+  {id:"blue",    label:"Bleu",        value:"#4DABF7",  minLevel:6,  special:null},
+  {id:"green",   label:"Vert",        value:"#51CF66",  minLevel:6,  special:null},
+  {id:"purple",  label:"Violet",      value:"#CC5DE8",  minLevel:11, special:null},
+  {id:"orange",  label:"Orange",      value:"#FF922B",  minLevel:11, special:null},
+  {id:"pink",    label:"Rose",        value:"#F783AC",  minLevel:11, special:null},
+  {id:"gold",    label:"Or ✨",       value:"gold",     minLevel:21, special:"gold"},
+  {id:"rainbow", label:"Arc-en-ciel", value:"rainbow",  minLevel:21, special:"rainbow"},
+];
+const getUserNameColor = name => { const u=DB.find(x=>x.name===name); return u?.nameColor||null; };
+
 const CITIES = {
   "paris":[48.856,2.352],"marseille":[43.296,5.369],"lyon":[45.764,4.835],
   "toulouse":[43.604,1.444],"nice":[43.710,7.262],"bordeaux":[44.837,-0.579],
@@ -391,13 +427,13 @@ const CITIES = {
 
 // ─── AUTH ─────────────────────────────────────────────────────────────────────
 const DB = [
-  { id:"u1", email:"demo@rvf.app",   password:"demo123", name:"Alex Martin", city:"Paris",        level:"Intermédiaire", sports:["football","basketball"],      bio:"Passionné de foot et basket.",       avatar:null, phone:"", verified:true,  terrains:3, matchs:38, teams:2, record:{ football:{w:18,l:12}, basketball:{w:6,l:2} }, referralCode:"ALEX1234", referralCount:12 },
-  { id:"u2", email:"lucas@rvf.app",  password:"pass",    name:"Lucas M.",    city:"Paris",        level:"Amateur",       sports:["football"],                   bio:"Footeux du dimanche ⚽",              avatar:null, phone:"", verified:true,  terrains:1, matchs:12, teams:1, record:{ football:{w:5,l:7} },                                   referralCode:"LUCAS001", referralCount:2  },
-  { id:"u3", email:"sara@rvf.app",   password:"pass",    name:"Sara K.",     city:"Berlin",       level:"Confirmé",      sports:["tennis","padel"],             bio:"Passionnée de tennis et padel.",     avatar:null, phone:"", verified:true,  terrains:2, matchs:28, teams:1, record:{ tennis:{w:19,l:5}, padel:{w:3,l:1} },                  referralCode:"SARA2024", referralCount:11 },
-  { id:"u4", email:"tom@rvf.app",    password:"pass",    name:"Tom B.",      city:"Londres",      level:"Intermédiaire", sports:["rugby","football"],           bio:"Rugby player from London.",          avatar:null, phone:"", verified:false, terrains:0, matchs:15, teams:2, record:{ rugby:{w:9,l:4}, football:{w:1,l:1} },                   referralCode:"TOM2024",  referralCount:0  },
-  { id:"u5", email:"jade@rvf.app",   password:"pass",    name:"Jade R.",     city:"Rio",          level:"Expert",        sports:["volleyball","football"],      bio:"Carioca dans l'âme 🌊",              avatar:null, phone:"", verified:true,  terrains:5, matchs:67, teams:3, record:{ volleyball:{w:42,l:10}, football:{w:12,l:3} },          referralCode:"JADE2024", referralCount:27 },
-  { id:"u6", email:"carlos@rvf.app", password:"pass",    name:"Carlos M.",   city:"Madrid",       level:"Confirmé",      sports:["padel","football","tennis"],  bio:"Padel lover & football fanatic.",    avatar:null, phone:"", verified:true,  terrains:3, matchs:45, teams:2, record:{ padel:{w:20,l:8}, football:{w:14,l:2}, tennis:{w:1,l:0} }, referralCode:"CARLOS24", referralCount:53 },
-  { id:"u7", email:"noe@rvf.app",    password:"pass",    name:"Noé V.",      city:"Tokyo",        level:"Amateur",       sports:["basketball","pingpong"],      bio:"Tokyo baller 🏀🏓",                  avatar:null, phone:"", verified:false, terrains:1, matchs:9,  teams:1, record:{ basketball:{w:5,l:4}, pingpong:{w:0,l:0} },              referralCode:"NOE2024",  referralCount:0  },
+  { id:"u1", email:"demo@rvf.app",   password:"demo123", name:"Alex Martin", city:"Paris",   level:"Intermédiaire", sports:["football","basketball"],     bio:"Passionné de foot et basket.",       avatar:null, phone:"", verified:true,  terrains:3, matchs:38, teams:2, citiesVisited:5,  xp:2100,  nameColor:"#4DABF7", record:{ football:{w:18,l:12}, basketball:{w:6,l:2} }, referralCode:"ALEX1234", referralCount:12 },
+  { id:"u2", email:"lucas@rvf.app",  password:"pass",    name:"Lucas M.",    city:"Paris",   level:"Amateur",       sports:["football"],                  bio:"Footeux du dimanche ⚽",              avatar:null, phone:"", verified:true,  terrains:1, matchs:12, teams:1, citiesVisited:1,  xp:450,   nameColor:null,      record:{ football:{w:5,l:7} },                                   referralCode:"LUCAS001", referralCount:2  },
+  { id:"u3", email:"sara@rvf.app",   password:"pass",    name:"Sara K.",     city:"Berlin",  level:"Confirmé",      sports:["tennis","padel"],            bio:"Passionnée de tennis et padel.",     avatar:null, phone:"", verified:true,  terrains:2, matchs:28, teams:1, citiesVisited:4,  xp:1600,  nameColor:"#51CF66", record:{ tennis:{w:19,l:5}, padel:{w:3,l:1} },                  referralCode:"SARA2024", referralCount:11 },
+  { id:"u4", email:"tom@rvf.app",    password:"pass",    name:"Tom B.",      city:"Londres", level:"Intermédiaire", sports:["rugby","football"],          bio:"Rugby player from London.",          avatar:null, phone:"", verified:false, terrains:0, matchs:15, teams:2, citiesVisited:2,  xp:700,   nameColor:null,      record:{ rugby:{w:9,l:4}, football:{w:1,l:1} },                   referralCode:"TOM2024",  referralCount:0  },
+  { id:"u5", email:"jade@rvf.app",   password:"pass",    name:"Jade R.",     city:"Rio",     level:"Expert",        sports:["volleyball","football"],     bio:"Carioca dans l'âme 🌊",              avatar:null, phone:"", verified:true,  terrains:5, matchs:67, teams:3, citiesVisited:8,  xp:5600,  nameColor:"#CC5DE8", record:{ volleyball:{w:42,l:10}, football:{w:12,l:3} },          referralCode:"JADE2024", referralCount:27 },
+  { id:"u6", email:"carlos@rvf.app", password:"pass",    name:"Carlos M.",   city:"Madrid",  level:"Confirmé",      sports:["padel","football","tennis"], bio:"Padel lover & football fanatic.",    avatar:null, phone:"", verified:true,  terrains:3, matchs:45, teams:2, citiesVisited:6,  xp:22000, nameColor:"gold",    record:{ padel:{w:20,l:8}, football:{w:14,l:2}, tennis:{w:1,l:0} }, referralCode:"CARLOS24", referralCount:53 },
+  { id:"u7", email:"noe@rvf.app",    password:"pass",    name:"Noé V.",      city:"Tokyo",   level:"Amateur",       sports:["basketball","pingpong"],     bio:"Tokyo baller 🏀🏓",                  avatar:null, phone:"", verified:false, terrains:1, matchs:9,  teams:1, citiesVisited:1,  xp:200,   nameColor:null,      record:{ basketball:{w:5,l:4}, pingpong:{w:0,l:0} },              referralCode:"NOE2024",  referralCount:0  },
 ];
 
 const getUserBadge = name => { const u=DB.find(x=>x.name===name); return u?getReferralLevel(u.referralCount||0).badge:""; };
@@ -447,6 +483,7 @@ async function register(form) {
     const referrer = DB.find(u=>u.referralCode===refCode);
     if (referrer) {
       referrer.referralCount = (referrer.referralCount||0)+1;
+      addXP(referrer.id, XP_REWARDS.referral);
       await supabase.from('profiles').update({ referral_count:referrer.referralCount }).eq('id',referrer.id);
     } else {
       // referrer is a Supabase-only user
@@ -498,6 +535,15 @@ function createStore(init = {}) {
   store.notify = () => store._subs.forEach(fn => fn());
   return store;
 }
+
+// ─── XP STORE ─────────────────────────────────────────────────────────────────
+const XP_STORE = createStore({});
+const addXP = (userId, amount) => {
+  const u = DB.find(x=>x.id===userId);
+  if (!u) return;
+  u.xp = (u.xp||0)+amount;
+  XP_STORE.notify();
+};
 
 // Realtime presence
 const RT = createStore({ slots:{}, photos:{} });
@@ -902,6 +948,15 @@ function Btn({ children, onClick, variant="primary", loading=false, disabled=fal
       {loading ? "⏳ Chargement…" : children}
     </button>
   );
+}
+
+function ColoredName({ name, nameColor, style={} }) {
+  if (!nameColor) return <span style={style}>{name}</span>;
+  if (nameColor==="gold") return (
+    <span style={{...style,background:"linear-gradient(90deg,#FFD700,#FFA500,#FFD700)",WebkitBackgroundClip:"text",WebkitTextFillColor:"transparent",backgroundClip:"text"}}>{name}</span>
+  );
+  if (nameColor==="rainbow") return <span className="rvf-rainbow" style={style}>{name}</span>;
+  return <span style={{...style,color:nameColor}}>{name}</span>;
 }
 
 function ErrBox({ msg }) {
@@ -2233,6 +2288,7 @@ function ReservationTab({ terrain, user, sp }) {
     BOOK.add({ user:user?.name||"Joueur", terrainId:terrain.id, day:selDay, hour:selHour, weekOffset, phone:isFree?null:phone });
     const slotParts = [...new Set(BOOK.list.filter(b=>b.terrainId===terrain.id&&b.day===selDay&&b.hour===selHour).map(b=>b.user))];
     MATCH_SCORE.add({ terrainId:terrain.id, terrainName:terrain.name, terrainSport:terrainSports(terrain)[0], day:selDay, hour:selHour, participants:slotParts });
+    if (user?.id) addXP(user.id, XP_REWARDS.visit);
     setStep("done"); setPhone(""); setPhoneErr("");
   };
 
@@ -4463,7 +4519,7 @@ function MessagingView({ user, openWith }) {
                     </div>
                   )}
                   <div style={{maxWidth:"68%"}}>
-                    {!isMe && <div style={{fontSize:10,color:C.sub,marginBottom:3,paddingLeft:2,fontWeight:600}}>{msg.from}{getUserBadge(msg.from)&&<span style={{marginLeft:3}}>{getUserBadge(msg.from)}</span>}</div>}
+                    {!isMe && <div style={{fontSize:10,color:C.sub,marginBottom:3,paddingLeft:2,fontWeight:600}}><ColoredName name={msg.from} nameColor={getUserNameColor(msg.from)}/>{getUserBadge(msg.from)&&<span style={{marginLeft:3}}>{getUserBadge(msg.from)}</span>}</div>}
                     <div style={{padding:"10px 14px",borderRadius:isMe?"16px 16px 4px 16px":"16px 16px 16px 4px",background:isMe?`${C.purple}22`:C.card,border:`1px solid ${isMe?C.purple+"55":C.border}`,fontSize:13,color:C.text,lineHeight:1.5}}>
                       {msg.text}
                     </div>
@@ -4526,6 +4582,7 @@ function ProfileView({ user, onLogout, onUpdate, onGoSupport, onGoAdmin }) {
   const fileRef              = useRef();
   useStore(BOOK);
   useStore(MATCH_SCORE);
+  useStore(XP_STORE);
 
   const save = () => { onUpdate({...user,name,bio,level}); setEditing(false); };
   const toggleProfileSport = id => {
@@ -4552,7 +4609,7 @@ function ProfileView({ user, onLogout, onUpdate, onGoSupport, onGoAdmin }) {
               {editing
                 ? <input value={name} onChange={e=>setName(e.target.value)} style={{background:C.card2,border:`1px solid ${C.accent}44`,borderRadius:7,padding:"5px 10px",color:C.text,fontSize:18,fontWeight:700,outline:"none",width:"100%",fontFamily:C.head}}/>
                 : <div style={{display:"flex",alignItems:"center",gap:8}}>
-                    <div style={{fontFamily:C.head,fontWeight:700,fontSize:22,color:C.text}}>{user.name}</div>
+                    <ColoredName name={user.name} nameColor={user.nameColor} style={{fontFamily:C.head,fontWeight:700,fontSize:22,color:C.text}}/>
                     {getReferralLevel(user.referralCount||0).badge && (
                       <span title={getReferralLevel(user.referralCount||0).name} style={{fontSize:18,lineHeight:1}}>{getReferralLevel(user.referralCount||0).badge}</span>
                     )}
@@ -4593,6 +4650,119 @@ function ProfileView({ user, onLogout, onUpdate, onGoSupport, onGoAdmin }) {
             </div>
           ))}
         </div>
+
+        {/* XP / Niveau */}
+        {(() => {
+          const liveUser = DB.find(x=>x.id===user.id)||user;
+          const xp       = liveUser.xp||0;
+          const curLv    = getXpLevel(xp);
+          const nextLv   = XP_LEVELS.find(l=>l.xp>xp);
+          const progress = nextLv ? Math.round((xp-curLv.xp)/(nextLv.xp-curLv.xp)*100) : 100;
+          const lvColor  = curLv.level>=21?"#FFD700":curLv.level>=11?"#CC5DE8":curLv.level>=6?"#4DABF7":"#51CF66";
+          return (
+            <div style={{background:C.card,border:`1px solid ${lvColor}33`,borderRadius:14,padding:16,marginBottom:16}}>
+              <div style={{fontSize:10,fontWeight:700,color:C.sub,textTransform:"uppercase",letterSpacing:1.5,marginBottom:12}}>⚡ Expérience & Niveau</div>
+              <div style={{display:"flex",alignItems:"center",gap:12,marginBottom:14}}>
+                <div style={{width:52,height:52,borderRadius:14,background:`${lvColor}18`,border:`2px solid ${lvColor}55`,display:"flex",alignItems:"center",justifyContent:"center",fontFamily:C.head,fontWeight:800,fontSize:22,color:lvColor,flexShrink:0}}>
+                  {curLv.level}
+                </div>
+                <div style={{flex:1,minWidth:0}}>
+                  <div style={{fontFamily:C.head,fontWeight:700,fontSize:16,color:C.text}}>Niveau {curLv.level}</div>
+                  <div style={{fontSize:11,color:C.sub,marginTop:1}}>{xp.toLocaleString()} XP total</div>
+                  {nextLv ? (
+                    <div style={{marginTop:7}}>
+                      <div style={{display:"flex",justifyContent:"space-between",fontSize:10,color:C.sub,marginBottom:3}}>
+                        <span>Niveau {nextLv.level} à {nextLv.xp.toLocaleString()} XP</span>
+                        <span style={{color:lvColor,fontWeight:700}}>{progress}%</span>
+                      </div>
+                      <div style={{height:6,borderRadius:3,background:C.card2,overflow:"hidden"}}>
+                        <div style={{height:"100%",borderRadius:3,background:lvColor,width:`${progress}%`,transition:"width .6s ease"}}/>
+                      </div>
+                    </div>
+                  ) : <div style={{fontSize:11,color:lvColor,fontWeight:700,marginTop:6}}>🏆 Niveau maximum !</div>}
+                </div>
+              </div>
+              <div style={{display:"flex",gap:8,fontSize:11,color:C.sub,flexWrap:"wrap"}}>
+                {[["🏟️",`+${XP_REWARDS.terrain} XP terrain créé`],["🏃",`+${XP_REWARDS.visit} XP terrain visité`],["⚽",`+${XP_REWARDS.match} XP match joué`],["🤝",`+${XP_REWARDS.referral} XP parrainage`]].map(([ico,lbl])=>(
+                  <span key={lbl} style={{background:C.card2,borderRadius:20,padding:"3px 9px"}}>{ico} {lbl}</span>
+                ))}
+              </div>
+            </div>
+          );
+        })()}
+
+        {/* Insignes */}
+        {(() => {
+          const liveUser = DB.find(x=>x.id===user.id)||user;
+          const allBadges = getUserBadges(liveUser);
+          return (
+            <div style={{background:C.card,border:`1px solid ${C.border}`,borderRadius:14,padding:16,marginBottom:16}}>
+              <div style={{fontSize:10,fontWeight:700,color:C.sub,textTransform:"uppercase",letterSpacing:1.5,marginBottom:12}}>🎖️ Insignes</div>
+              <div style={{display:"flex",flexDirection:"column",gap:10}}>
+                {allBadges.map(({def,tier})=>{
+                  const val = def.stat(liveUser);
+                  const next = def.tiers.find(t=>val<t.min);
+                  const pct  = tier ? (next ? Math.round((val-tier.min)/(next.min-tier.min)*100) : 100)
+                                     : (next ? Math.round(val/next.min*100) : 0);
+                  return (
+                    <div key={def.id} style={{background:C.card2,borderRadius:12,padding:"11px 13px"}}>
+                      <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:6}}>
+                        <div style={{width:38,height:38,borderRadius:10,background:tier?"rgba(255,215,0,.1)":C.card,border:`1px solid ${tier?"rgba(255,215,0,.4)":C.border}`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:18,flexShrink:0,opacity:tier?1:0.45}}>
+                          {def.emoji}
+                        </div>
+                        <div style={{flex:1,minWidth:0}}>
+                          <div style={{display:"flex",alignItems:"center",gap:6}}>
+                            <span style={{fontSize:13,fontWeight:700,color:tier?C.text:C.sub}}>{def.name}</span>
+                            {tier && <span style={{fontSize:13}}>{tier.medal}</span>}
+                            {!tier && <span style={{fontSize:10,color:C.sub,background:C.card,borderRadius:4,padding:"1px 6px"}}>Non débloqué</span>}
+                          </div>
+                          <div style={{fontSize:10,color:C.sub,marginTop:1}}>{def.desc} · {val}/{(tier?next||def.tiers[def.tiers.length-1]:def.tiers[0]).min}</div>
+                        </div>
+                      </div>
+                      <div style={{height:4,borderRadius:2,background:C.card,overflow:"hidden"}}>
+                        <div style={{height:"100%",borderRadius:2,background:tier?"#FFD700":C.accent,width:`${Math.min(100,pct)}%`,transition:"width .6s ease"}}/>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          );
+        })()}
+
+        {/* Couleur du pseudo */}
+        {(() => {
+          const liveUser = DB.find(x=>x.id===user.id)||user;
+          const xp       = liveUser.xp||0;
+          const curLevel = getXpLevel(xp).level;
+          const current  = user.nameColor||null;
+          return (
+            <div style={{background:C.card,border:`1px solid ${C.border}`,borderRadius:14,padding:16,marginBottom:16}}>
+              <div style={{fontSize:10,fontWeight:700,color:C.sub,textTransform:"uppercase",letterSpacing:1.5,marginBottom:12}}>🎨 Couleur du pseudo</div>
+              <div style={{display:"flex",flexWrap:"wrap",gap:8}}>
+                {NAME_COLORS.map(nc=>{
+                  const locked  = curLevel < nc.minLevel;
+                  const active  = current===nc.value||(current===null&&nc.id==="default");
+                  const preview = nc.special==="gold" ? "linear-gradient(90deg,#FFD700,#FFA500,#FFD700)" : null;
+                  return (
+                    <button key={nc.id} onClick={locked?undefined:()=>onUpdate({...user,nameColor:nc.value})}
+                      title={locked?`Niveau ${nc.minLevel} requis`:nc.label}
+                      style={{display:"flex",alignItems:"center",gap:6,padding:"6px 12px",borderRadius:20,cursor:locked?"not-allowed":"pointer",fontFamily:C.font,fontWeight:600,fontSize:12,
+                        background:active?`${C.accent}18`:C.card2,
+                        border:`1.5px solid ${active?C.accent:C.border}`,
+                        opacity:locked?0.38:1,transition:"all .15s",position:"relative"}}>
+                      <span style={{width:12,height:12,borderRadius:"50%",display:"inline-block",flexShrink:0,
+                        background:nc.special==="gold"?"linear-gradient(135deg,#FFD700,#FFA500)":nc.value||C.text,
+                        border:`1px solid rgba(255,255,255,.2)`}}/>
+                      <ColoredName name={nc.label} nameColor={nc.value}/>
+                      {locked && <span style={{position:"absolute",top:-6,right:-4,fontSize:9,background:C.card2,border:`1px solid ${C.border}`,borderRadius:6,padding:"1px 4px",color:C.sub}}>Niv.{nc.minLevel}</span>}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          );
+        })()}
 
         {/* Parrainage */}
         {(() => {
@@ -5202,6 +5372,7 @@ function InvitesPanel({ user, onClose }) {
     const a = parseInt(inp.a||"0",10), b = parseInt(inp.b||"0",10);
     if (isNaN(a)||isNaN(b)) return;
     MATCH_SCORE.submit(req.id, `${a} - ${b}`, user.name);
+    addXP(user.id, XP_REWARDS.match);
     setScoreInputs(p=>({...p,[req.id]:undefined}));
   };
 
@@ -5710,6 +5881,8 @@ export default function App() {
 
   const doUpdate = u => {
     setUser(u);
+    const dbU = DB.find(x=>x.id===u.id);
+    if (dbU) { dbU.nameColor=u.nameColor; if(u.xp!==undefined) dbU.xp=u.xp; }
     const token = localStorage.getItem('rvf_token');
     if (!token) return; // local mock mode — no persistence needed
     fetch(`${API}/api/auth/profile`, {
@@ -5720,6 +5893,7 @@ export default function App() {
   };
 
   const addTerrain = async t => {
+    if (user?.id) addXP(user.id, XP_REWARDS.terrain);
     const { data: inserted, error } = await supabase.from('terrains').insert(t).select().single();
     if (!error && inserted) { setTerrains(p => [...p, inserted]); return; }
     // Fallback: Express backend
@@ -5781,6 +5955,8 @@ export default function App() {
         input::placeholder, textarea::placeholder { color:#3d5066; }
         button:focus { outline:none; }
         @keyframes pulse { 0%,100%{box-shadow:0 0 0 4px rgba(0,229,160,.35),0 0 20px rgba(0,229,160,.6)} 50%{box-shadow:0 0 0 10px rgba(0,229,160,.1),0 0 30px rgba(0,229,160,.9)} }
+        @keyframes rvfRainbow{0%{color:#ff0000}16%{color:#ff8800}33%{color:#ffee00}50%{color:#00cc44}66%{color:#0088ff}83%{color:#9900ff}100%{color:#ff0000}}
+        .rvf-rainbow{animation:rvfRainbow 3s linear infinite}
         .leaflet-popup-content-wrapper{background:#0d1421;color:#e9ecef;border:1px solid rgba(255,255,255,.1);border-radius:14px;box-shadow:0 12px 40px rgba(0,0,0,.85);padding:0}
         .leaflet-popup-content{margin:0;font-family:'DM Sans',sans-serif}
         .leaflet-popup-tip{background:#0d1421}
