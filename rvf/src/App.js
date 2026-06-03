@@ -959,6 +959,25 @@ function ColoredName({ name, nameColor, style={} }) {
   return <span style={{...style,color:nameColor}}>{name}</span>;
 }
 
+// Reusable badge: colored name + level chip + top earned badges
+function UserBadge({ name, size="md", showLevel=true, showInsignes=true, style={} }) {
+  const u = DB.find(x=>x.name===name) || { name:name||"?", xp:0, nameColor:null, referralCount:0, matchs:0, terrains:0, citiesVisited:0 };
+  const lvl   = getXpLevel(u.xp||0).level;
+  const lvCol = lvl>=21?"#FFD700":lvl>=11?"#CC5DE8":lvl>=6?"#4DABF7":"#888";
+  const earned = getEarnedBadges(u);
+  const top    = earned.length ? earned[earned.length-1] : null;
+  const refBadge = getReferralLevel(u.referralCount||0).badge;
+  const fs = size==="sm"?11:size==="lg"?17:13;
+  return (
+    <span style={{display:"inline-flex",alignItems:"center",gap:4,...style}}>
+      <ColoredName name={name} nameColor={u.nameColor||null} style={{fontWeight:700,fontSize:fs}}/>
+      {showLevel && <span style={{fontSize:fs-3,fontWeight:700,color:lvCol,background:`${lvCol}18`,border:`1px solid ${lvCol}33`,borderRadius:4,padding:"0 4px",whiteSpace:"nowrap"}}>Niv.{lvl}</span>}
+      {showInsignes && top && <span title={`${top.def.name} ${top.tier.label}`} style={{fontSize:fs-1}}>{top.tier.medal}</span>}
+      {showInsignes && refBadge && <span title={getReferralLevel(u.referralCount||0).name} style={{fontSize:fs-1}}>{refBadge}</span>}
+    </span>
+  );
+}
+
 function ErrBox({ msg }) {
   if (!msg) return null;
   return <div style={{background:"rgba(255,107,107,.08)",border:"1px solid rgba(255,107,107,.3)",borderRadius:8,padding:"10px 14px",color:C.red,fontSize:13}}>{msg}</div>;
@@ -3443,7 +3462,7 @@ function TeamsView({ user, terrains, onGoToMessages }) {
                       <div style={{display:"flex",gap:12,marginBottom:12,alignItems:"center"}}>
                         <Avatar name={req.fromName} size={42} color={C.accent} photo={fromUser?.avatar}/>
                         <div style={{flex:1,minWidth:0}}>
-                          <div style={{fontSize:14,fontWeight:700,color:C.text}}>{req.fromName}{getUserBadge(req.fromName)&&<span style={{marginLeft:4}}>{getUserBadge(req.fromName)}</span>}</div>
+                          <UserBadge name={req.fromName} size="md" showLevel showInsignes/>
                           <div style={{fontSize:12,color:C.accent,fontWeight:600,marginTop:1}}>→ {req.teamName}</div>
                           {fromUser?.city && <div style={{fontSize:11,color:C.sub,marginTop:2}}>📍 {fromUser.city} · {fromUser.level||"Amateur"}</div>}
                         </div>
@@ -3485,7 +3504,7 @@ function TeamsView({ user, terrains, onGoToMessages }) {
                           {r.isSolo ? (
                             <>
                               <div style={{width:36,height:36,borderRadius:"50%",background:`${C.orange}25`,border:`2px solid ${C.orange}55`,display:"flex",alignItems:"center",justifyContent:"center",margin:"0 auto 4px",fontSize:16,fontWeight:700,color:C.orange}}>{(r.fromUserName||"?")[0]}</div>
-                              <div style={{fontSize:12,fontWeight:700,color:C.text}}>{r.fromUserName}{getUserBadge(r.fromUserName)&&<span style={{marginLeft:4}}>{getUserBadge(r.fromUserName)}</span>}</div>
+                              <UserBadge name={r.fromUserName} size="sm" showLevel showInsignes/>
                             </>
                           ) : (
                             <>
@@ -3660,7 +3679,7 @@ function TeamsView({ user, terrains, onGoToMessages }) {
                   <div style={{display:"flex",gap:12,marginBottom:14,alignItems:"center"}}>
                     <Avatar name={req.fromName} size={46} color={C.accent} photo={fromUser?.avatar}/>
                     <div style={{flex:1,minWidth:0}}>
-                      <div style={{fontSize:15,fontWeight:700,color:C.text}}>{req.fromName}{getUserBadge(req.fromName)&&<span style={{marginLeft:4}}>{getUserBadge(req.fromName)}</span>}</div>
+                      <UserBadge name={req.fromName} size="md" showLevel showInsignes/>
                       <div style={{fontSize:12,color:C.accent,fontWeight:600,marginTop:2}}>→ {req.teamName}</div>
                       {fromUser?.city && <div style={{fontSize:11,color:C.sub,marginTop:2}}>📍 {fromUser.city} · {fromUser.level||"Amateur"}</div>}
                       <div style={{fontSize:10,color:C.sub,marginTop:3}}>{timeAgo(req.ts)}</div>
@@ -3746,8 +3765,8 @@ function UserProfileModal({ profile, currentUser, onClose, onGoToMessages }) {
           <div style={{display:"flex",gap:14,alignItems:"center",marginBottom:16}}>
             <Avatar name={profile.name} size={60} color={C.accent} photo={profile.avatar}/>
             <div>
-              <div style={{display:"flex",alignItems:"center",gap:7}}>
-                <div style={{fontFamily:C.head,fontWeight:700,fontSize:20,color:C.text}}>{profile.name}</div>
+              <div style={{display:"flex",alignItems:"center",gap:7,flexWrap:"wrap"}}>
+                <UserBadge name={profile.name} size="lg" showLevel showInsignes/>
                 {profile.verified&&<span style={{background:"rgba(81,207,102,.15)",color:C.green,border:"1px solid rgba(81,207,102,.4)",borderRadius:5,padding:"2px 7px",fontSize:9,fontWeight:700}}>{t('profile.verified')}</span>}
               </div>
               <div style={{fontSize:12,color:C.sub,marginTop:3}}>📍 {profile.city}</div>
@@ -3768,9 +3787,31 @@ function UserProfileModal({ profile, currentUser, onClose, onGoToMessages }) {
               </div>
             ))}
           </div>
-          <div style={{display:"flex",gap:5,flexWrap:"wrap",marginBottom:14}}>
+          <div style={{display:"flex",gap:5,flexWrap:"wrap",marginBottom:10}}>
             {profile.sports?.map(sid=>{const s=SPORTS.find(x=>x.id===sid);return s?<Badge key={sid} label={<><SportEmoji sport={s} size={11}/> {s.label}</>} color={s.color}/>:null;})}
           </div>
+          {/* Insignes & couleur de pseudo */}
+          {(() => {
+            const earned = getEarnedBadges(profile);
+            const refBadge = getReferralLevel(profile.referralCount||0);
+            if (!earned.length && !refBadge.badge) return null;
+            return (
+              <div style={{display:"flex",gap:6,flexWrap:"wrap",marginBottom:14,padding:"8px 10px",background:C.card2,borderRadius:10}}>
+                {earned.map(({def,tier})=>(
+                  <span key={def.id} title={`${def.name} — ${tier.label}`}
+                    style={{display:"inline-flex",alignItems:"center",gap:3,fontSize:11,color:C.text,background:C.card,border:`1px solid rgba(255,215,0,.3)`,borderRadius:16,padding:"3px 8px"}}>
+                    {def.emoji} {tier.medal} {def.name}
+                  </span>
+                ))}
+                {refBadge.badge && (
+                  <span title={`Parrainage — ${refBadge.name}`}
+                    style={{display:"inline-flex",alignItems:"center",gap:3,fontSize:11,color:C.text,background:C.card,border:`1px solid rgba(205,127,50,.3)`,borderRadius:16,padding:"3px 8px"}}>
+                    {refBadge.badge} {refBadge.name}
+                  </span>
+                )}
+              </div>
+            );
+          })()}
           {profile.record && Object.keys(profile.record).length>0 && (
             <div style={{marginBottom:16}}>
               <div style={{fontSize:10,fontWeight:700,color:C.sub,textTransform:"uppercase",letterSpacing:1,marginBottom:8}}>Ratio V / D par sport</div>
@@ -4038,8 +4079,8 @@ function SocialView({ user, terrains, onGoToMessages }) {
                         <span style={{position:"absolute",bottom:0,right:0,width:12,height:12,borderRadius:"50%",background:C.green,border:`2px solid ${C.card}`}}/>
                       </div>
                       <div style={{flex:1,minWidth:0}}>
-                        <div style={{display:"flex",alignItems:"center",gap:6}}>
-                          <span style={{fontSize:14,fontWeight:700,color:C.text}}>{u.name}</span>
+                        <div style={{display:"flex",alignItems:"center",gap:6,flexWrap:"wrap"}}>
+                          <UserBadge name={u.name} size="md" showLevel showInsignes/>
                           {u.verified&&<span style={{fontSize:9,color:C.green,fontWeight:700}}>✅</span>}
                         </div>
                         <div style={{fontSize:11,color:C.sub,marginTop:2}}>📍 {u.city} · <span style={{color:C.accent}}>{u.level}</span></div>
@@ -4343,8 +4384,8 @@ function MessagingView({ user, openWith }) {
                           style={{display:"flex",alignItems:"center",gap:9,padding:"7px 10px",borderRadius:9,cursor:"pointer",fontFamily:C.font,background:C.card,border:`1px solid ${C.border}`,color:C.text,textAlign:"left",width:"100%"}}>
                           <Avatar name={p.name} size={28} color={p.isFriend?C.accent:C.sub} photo={DB.find(u=>u.name===p.name)?.avatar}/>
                           <div style={{flex:1,minWidth:0}}>
-                            <div style={{fontSize:12,fontWeight:700,color:C.text}}>{p.name}</div>
-                            {p.isFriend&&<div style={{fontSize:10,color:C.accent}}>👥 Ami</div>}
+                            <UserBadge name={p.name} size="sm" showInsignes={false}/>
+                            {p.isFriend&&<div style={{fontSize:10,color:C.accent,marginTop:1}}>👥 Ami</div>}
                           </div>
                           <span style={{fontSize:11,color:C.sub}}>💬</span>
                         </button>
@@ -4367,7 +4408,7 @@ function MessagingView({ user, openWith }) {
                         </div>
                         <div style={{flex:1,minWidth:0}}>
                           <div style={{display:"flex",justifyContent:"space-between"}}>
-                            <span style={{fontSize:13,fontWeight:700,color:C.text}}>{conv.other}</span>
+                            <UserBadge name={conv.other} size="sm" showLevel={false} showInsignes={false}/>
                             <span style={{fontSize:10,color:C.sub}}>{conv.last?timeAgo(conv.last.ts):""}</span>
                           </div>
                           <div style={{fontSize:11,color:conv.unread>0?C.accent:C.sub,marginTop:2,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis",fontWeight:conv.unread>0?700:400}}>
@@ -4519,7 +4560,7 @@ function MessagingView({ user, openWith }) {
                     </div>
                   )}
                   <div style={{maxWidth:"68%"}}>
-                    {!isMe && <div style={{fontSize:10,color:C.sub,marginBottom:3,paddingLeft:2,fontWeight:600}}><ColoredName name={msg.from} nameColor={getUserNameColor(msg.from)}/>{getUserBadge(msg.from)&&<span style={{marginLeft:3}}>{getUserBadge(msg.from)}</span>}</div>}
+                    {!isMe && <div style={{marginBottom:3,paddingLeft:2}}><UserBadge name={msg.from} size="sm" showLevel showInsignes/></div>}
                     <div style={{padding:"10px 14px",borderRadius:isMe?"16px 16px 4px 16px":"16px 16px 16px 4px",background:isMe?`${C.purple}22`:C.card,border:`1px solid ${isMe?C.purple+"55":C.border}`,fontSize:13,color:C.text,lineHeight:1.5}}>
                       {msg.text}
                     </div>
@@ -5422,7 +5463,7 @@ function InvitesPanel({ user, onClose }) {
                       <div style={{display:"flex",gap:10,marginBottom:isPending?10:0,alignItems:"center"}}>
                         <Avatar name={req.fromName} size={44} color={C.accent} photo={fromUser?.avatar}/>
                         <div style={{flex:1,minWidth:0}}>
-                          <div style={{fontSize:13,fontWeight:700,color:C.text}}>{req.fromName}{getUserBadge(req.fromName)&&<span style={{marginLeft:4}}>{getUserBadge(req.fromName)}</span>}</div>
+                          <UserBadge name={req.fromName} size="sm" showLevel showInsignes/>
                           {fromUser?.city&&<div style={{fontSize:11,color:C.sub,marginTop:1}}>📍 {fromUser.city}</div>}
                           {fromUser?.level&&<div style={{marginTop:4}}><Badge label={fromUser.level} color={C.accent}/></div>}
                           <div style={{fontSize:10,color:C.sub,marginTop:4}}>{timeAgo(req.ts)}</div>
@@ -5456,7 +5497,7 @@ function InvitesPanel({ user, onClose }) {
                           <Avatar name={r.fromUserName} size={42} color={C.orange} photo={fromUser?.avatar}/>
                           <div style={{flex:1,minWidth:0}}>
                             <div style={{fontSize:11,fontWeight:700,color:C.orange,marginBottom:3}}>⚔️ DÉFI D'AMI</div>
-                            <div style={{fontSize:13,fontWeight:700,color:C.text}}>{r.fromUserName}{getUserBadge(r.fromUserName)&&<span style={{marginLeft:4}}>{getUserBadge(r.fromUserName)}</span>} <span style={{color:C.sub,fontWeight:400}}>{t('invites.challenges_from')}</span></div>
+                            <div style={{display:"flex",alignItems:"center",gap:6,flexWrap:"wrap"}}><UserBadge name={r.fromUserName} size="sm" showLevel showInsignes/><span style={{fontSize:12,color:C.sub,fontWeight:400}}>{t('invites.challenges_from')}</span></div>
                             {s&&<div style={{display:"flex",alignItems:"center",gap:5,marginTop:3}}><SportEmoji sport={s} size={13}/><span style={{fontSize:12,color:s.color,fontWeight:700}}>{s.label}</span></div>}
                             {r.terrainName&&<div style={{fontSize:12,fontWeight:700,color:C.text,marginTop:2}}>🏟️ {r.terrainName}{r.terrainCity?<span style={{color:C.accent,fontWeight:400}}> · {r.terrainCity}</span>:""}</div>}
                             <div style={{fontSize:12,color:C.sub,marginTop:1}}>📅 {r.day} · {r.hour}</div>
@@ -5514,7 +5555,7 @@ function InvitesPanel({ user, onClose }) {
                       <div style={{display:"flex",gap:10,marginBottom:10,alignItems:"center"}}>
                         <Avatar name={req.fromName} size={40} color={C.accent} photo={fromUser?.avatar}/>
                         <div style={{flex:1,minWidth:0}}>
-                          <div style={{fontSize:13,fontWeight:700,color:C.text}}>{req.fromName}{getUserBadge(req.fromName)&&<span style={{marginLeft:4}}>{getUserBadge(req.fromName)}</span>} <span style={{color:C.sub,fontWeight:400}}>veut rejoindre</span></div>
+                          <div style={{display:"flex",alignItems:"center",gap:6,flexWrap:"wrap"}}><UserBadge name={req.fromName} size="sm" showLevel showInsignes/><span style={{fontSize:12,color:C.sub,fontWeight:400}}>veut rejoindre</span></div>
                           <div style={{fontSize:13,fontWeight:700,color:C.accent,marginTop:1}}>{req.teamName}</div>
                           {req.note&&<div style={{fontSize:12,color:C.text,marginTop:5,background:C.card,borderRadius:8,padding:"6px 10px",fontStyle:"italic"}}>"{req.note}"</div>}
                           <div style={{fontSize:10,color:C.sub,marginTop:4}}>{timeAgo(req.ts)}</div>
