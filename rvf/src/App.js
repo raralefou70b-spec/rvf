@@ -368,6 +368,16 @@ const PAST_MATCHES = [
   { id:"pm3", fromTeamId:1, fromTeamName:"Les Aigles FC", fromTeamAvatar:"🦅", toTeamId:2, toTeamName:"Slam Dunkers",  toTeamAvatar:"🏀", sport:"football", date:"10 avr", terrainName:"Stade Charléty",    terrainCity:"Paris", scoreFrom:2, scoreTo:2 },
 ];
 
+const REFERRAL_LEVELS = [
+  { level:1, name:"Recrue",      min:0,  badge:"",   color:"#888888" },
+  { level:2, name:"Ambassadeur", min:3,  badge:"🥉", color:"#cd7f32" },
+  { level:3, name:"Capitaine",   min:10, badge:"🥈", color:"#b0b0b0" },
+  { level:4, name:"Légende",     min:25, badge:"🥇", color:"#ffd700" },
+  { level:5, name:"Star",        min:50, badge:"💎", color:"#4fc3f7" },
+];
+const getReferralLevel = count => [...REFERRAL_LEVELS].reverse().find(l=>count>=l.min) || REFERRAL_LEVELS[0];
+const makeReferralCode  = name  => (name.replace(/\s+/g,"").toUpperCase().slice(0,6)+Math.floor(1000+Math.random()*9000));
+
 const CITIES = {
   "paris":[48.856,2.352],"marseille":[43.296,5.369],"lyon":[45.764,4.835],
   "toulouse":[43.604,1.444],"nice":[43.710,7.262],"bordeaux":[44.837,-0.579],
@@ -381,14 +391,16 @@ const CITIES = {
 
 // ─── AUTH ─────────────────────────────────────────────────────────────────────
 const DB = [
-  { id:"u1", email:"demo@rvf.app",   password:"demo123", name:"Alex Martin", city:"Paris",        level:"Intermédiaire", sports:["football","basketball"],      bio:"Passionné de foot et basket.",       avatar:null, phone:"", verified:true,  terrains:3, matchs:38, teams:2, record:{ football:{w:18,l:12}, basketball:{w:6,l:2} } },
-  { id:"u2", email:"lucas@rvf.app",  password:"pass",    name:"Lucas M.",    city:"Paris",        level:"Amateur",       sports:["football"],                   bio:"Footeux du dimanche ⚽",              avatar:null, phone:"", verified:true,  terrains:1, matchs:12, teams:1, record:{ football:{w:5,l:7} } },
-  { id:"u3", email:"sara@rvf.app",   password:"pass",    name:"Sara K.",     city:"Berlin",       level:"Confirmé",      sports:["tennis","padel"],             bio:"Passionnée de tennis et padel.",     avatar:null, phone:"", verified:true,  terrains:2, matchs:28, teams:1, record:{ tennis:{w:19,l:5}, padel:{w:3,l:1} } },
-  { id:"u4", email:"tom@rvf.app",    password:"pass",    name:"Tom B.",      city:"Londres",      level:"Intermédiaire", sports:["rugby","football"],           bio:"Rugby player from London.",          avatar:null, phone:"", verified:false, terrains:0, matchs:15, teams:2, record:{ rugby:{w:9,l:4}, football:{w:1,l:1} } },
-  { id:"u5", email:"jade@rvf.app",   password:"pass",    name:"Jade R.",     city:"Rio",          level:"Expert",        sports:["volleyball","football"],      bio:"Carioca dans l'âme 🌊",              avatar:null, phone:"", verified:true,  terrains:5, matchs:67, teams:3, record:{ volleyball:{w:42,l:10}, football:{w:12,l:3} } },
-  { id:"u6", email:"carlos@rvf.app", password:"pass",    name:"Carlos M.",   city:"Madrid",       level:"Confirmé",      sports:["padel","football","tennis"],  bio:"Padel lover & football fanatic.",    avatar:null, phone:"", verified:true,  terrains:3, matchs:45, teams:2, record:{ padel:{w:20,l:8}, football:{w:14,l:2}, tennis:{w:1,l:0} } },
-  { id:"u7", email:"noe@rvf.app",    password:"pass",    name:"Noé V.",      city:"Tokyo",        level:"Amateur",       sports:["basketball","pingpong"],      bio:"Tokyo baller 🏀🏓",                  avatar:null, phone:"", verified:false, terrains:1, matchs:9,  teams:1, record:{ basketball:{w:5,l:4}, pingpong:{w:0,l:0} } },
+  { id:"u1", email:"demo@rvf.app",   password:"demo123", name:"Alex Martin", city:"Paris",        level:"Intermédiaire", sports:["football","basketball"],      bio:"Passionné de foot et basket.",       avatar:null, phone:"", verified:true,  terrains:3, matchs:38, teams:2, record:{ football:{w:18,l:12}, basketball:{w:6,l:2} }, referralCode:"ALEX1234", referralCount:12 },
+  { id:"u2", email:"lucas@rvf.app",  password:"pass",    name:"Lucas M.",    city:"Paris",        level:"Amateur",       sports:["football"],                   bio:"Footeux du dimanche ⚽",              avatar:null, phone:"", verified:true,  terrains:1, matchs:12, teams:1, record:{ football:{w:5,l:7} },                                   referralCode:"LUCAS001", referralCount:2  },
+  { id:"u3", email:"sara@rvf.app",   password:"pass",    name:"Sara K.",     city:"Berlin",       level:"Confirmé",      sports:["tennis","padel"],             bio:"Passionnée de tennis et padel.",     avatar:null, phone:"", verified:true,  terrains:2, matchs:28, teams:1, record:{ tennis:{w:19,l:5}, padel:{w:3,l:1} },                  referralCode:"SARA2024", referralCount:11 },
+  { id:"u4", email:"tom@rvf.app",    password:"pass",    name:"Tom B.",      city:"Londres",      level:"Intermédiaire", sports:["rugby","football"],           bio:"Rugby player from London.",          avatar:null, phone:"", verified:false, terrains:0, matchs:15, teams:2, record:{ rugby:{w:9,l:4}, football:{w:1,l:1} },                   referralCode:"TOM2024",  referralCount:0  },
+  { id:"u5", email:"jade@rvf.app",   password:"pass",    name:"Jade R.",     city:"Rio",          level:"Expert",        sports:["volleyball","football"],      bio:"Carioca dans l'âme 🌊",              avatar:null, phone:"", verified:true,  terrains:5, matchs:67, teams:3, record:{ volleyball:{w:42,l:10}, football:{w:12,l:3} },          referralCode:"JADE2024", referralCount:27 },
+  { id:"u6", email:"carlos@rvf.app", password:"pass",    name:"Carlos M.",   city:"Madrid",       level:"Confirmé",      sports:["padel","football","tennis"],  bio:"Padel lover & football fanatic.",    avatar:null, phone:"", verified:true,  terrains:3, matchs:45, teams:2, record:{ padel:{w:20,l:8}, football:{w:14,l:2}, tennis:{w:1,l:0} }, referralCode:"CARLOS24", referralCount:53 },
+  { id:"u7", email:"noe@rvf.app",    password:"pass",    name:"Noé V.",      city:"Tokyo",        level:"Amateur",       sports:["basketball","pingpong"],      bio:"Tokyo baller 🏀🏓",                  avatar:null, phone:"", verified:false, terrains:1, matchs:9,  teams:1, record:{ basketball:{w:5,l:4}, pingpong:{w:0,l:0} },              referralCode:"NOE2024",  referralCount:0  },
 ];
+
+const getUserBadge = name => { const u=DB.find(x=>x.name===name); return u?getReferralLevel(u.referralCount||0).badge:""; };
 
 const pause = ms => new Promise(r => setTimeout(r, ms));
 
@@ -427,6 +439,22 @@ async function login(email, pwd) {
 }
 
 async function register(form) {
+  const refCode      = new URLSearchParams(window.location.search).get("ref");
+  const referralCode = makeReferralCode(form.name);
+
+  const creditReferrer = async (uid) => {
+    if (!refCode) return;
+    const referrer = DB.find(u=>u.referralCode===refCode);
+    if (referrer) {
+      referrer.referralCount = (referrer.referralCount||0)+1;
+      await supabase.from('profiles').update({ referral_count:referrer.referralCount }).eq('id',referrer.id);
+    } else {
+      // referrer is a Supabase-only user
+      const { data:rp } = await supabase.from('profiles').select('id,referral_count').eq('referral_code',refCode).single();
+      if (rp) await supabase.from('profiles').update({ referral_count:(rp.referral_count||0)+1 }).eq('id',rp.id);
+    }
+  };
+
   // Try Supabase auth first
   const { data, error } = await supabase.auth.signUp({
     email: form.email,
@@ -434,8 +462,9 @@ async function register(form) {
     options: { data: { name: form.name } },
   });
   if (!error && data.user) {
-    const profile = { id: data.user.id, name: form.name, city: form.city, sports: form.sports, level: form.level, phone: form.phone, email: form.email, verified: false, role: 'user', terrains: 0, matchs: 0, teams: 0, avatar: null };
+    const profile = { id: data.user.id, name: form.name, city: form.city, sports: form.sports, level: form.level, phone: form.phone, email: form.email, verified: false, role: 'user', terrains: 0, matchs: 0, teams: 0, avatar: null, referral_code: referralCode, referral_count: 0, referred_by: refCode||null };
     await supabase.from('profiles').upsert(profile);
+    await creditReferrer(data.user.id);
     return profile;
   }
   // Fallback: Express backend
@@ -453,7 +482,8 @@ async function register(form) {
   // Fallback: local mock DB
   await pause(500);
   if (DB.find(u => u.email === form.email)) throw new Error('Email déjà utilisé.');
-  const u = { id: 'u' + Date.now(), terrains: 0, matchs: 0, teams: 0, avatar: null, ...form };
+  const u = { id: 'u' + Date.now(), terrains: 0, matchs: 0, teams: 0, avatar: null, referralCode, referralCount: 0, referredBy: refCode||null, ...form };
+  await creditReferrer(u.id);
   DB.push(u);
   return { ...u };
 }
@@ -3357,7 +3387,7 @@ function TeamsView({ user, terrains, onGoToMessages }) {
                       <div style={{display:"flex",gap:12,marginBottom:12,alignItems:"center"}}>
                         <Avatar name={req.fromName} size={42} color={C.accent} photo={fromUser?.avatar}/>
                         <div style={{flex:1,minWidth:0}}>
-                          <div style={{fontSize:14,fontWeight:700,color:C.text}}>{req.fromName}</div>
+                          <div style={{fontSize:14,fontWeight:700,color:C.text}}>{req.fromName}{getUserBadge(req.fromName)&&<span style={{marginLeft:4}}>{getUserBadge(req.fromName)}</span>}</div>
                           <div style={{fontSize:12,color:C.accent,fontWeight:600,marginTop:1}}>→ {req.teamName}</div>
                           {fromUser?.city && <div style={{fontSize:11,color:C.sub,marginTop:2}}>📍 {fromUser.city} · {fromUser.level||"Amateur"}</div>}
                         </div>
@@ -3399,7 +3429,7 @@ function TeamsView({ user, terrains, onGoToMessages }) {
                           {r.isSolo ? (
                             <>
                               <div style={{width:36,height:36,borderRadius:"50%",background:`${C.orange}25`,border:`2px solid ${C.orange}55`,display:"flex",alignItems:"center",justifyContent:"center",margin:"0 auto 4px",fontSize:16,fontWeight:700,color:C.orange}}>{(r.fromUserName||"?")[0]}</div>
-                              <div style={{fontSize:12,fontWeight:700,color:C.text}}>{r.fromUserName}</div>
+                              <div style={{fontSize:12,fontWeight:700,color:C.text}}>{r.fromUserName}{getUserBadge(r.fromUserName)&&<span style={{marginLeft:4}}>{getUserBadge(r.fromUserName)}</span>}</div>
                             </>
                           ) : (
                             <>
@@ -3574,7 +3604,7 @@ function TeamsView({ user, terrains, onGoToMessages }) {
                   <div style={{display:"flex",gap:12,marginBottom:14,alignItems:"center"}}>
                     <Avatar name={req.fromName} size={46} color={C.accent} photo={fromUser?.avatar}/>
                     <div style={{flex:1,minWidth:0}}>
-                      <div style={{fontSize:15,fontWeight:700,color:C.text}}>{req.fromName}</div>
+                      <div style={{fontSize:15,fontWeight:700,color:C.text}}>{req.fromName}{getUserBadge(req.fromName)&&<span style={{marginLeft:4}}>{getUserBadge(req.fromName)}</span>}</div>
                       <div style={{fontSize:12,color:C.accent,fontWeight:600,marginTop:2}}>→ {req.teamName}</div>
                       {fromUser?.city && <div style={{fontSize:11,color:C.sub,marginTop:2}}>📍 {fromUser.city} · {fromUser.level||"Amateur"}</div>}
                       <div style={{fontSize:10,color:C.sub,marginTop:3}}>{timeAgo(req.ts)}</div>
@@ -4433,7 +4463,7 @@ function MessagingView({ user, openWith }) {
                     </div>
                   )}
                   <div style={{maxWidth:"68%"}}>
-                    {!isMe && <div style={{fontSize:10,color:C.sub,marginBottom:3,paddingLeft:2,fontWeight:600}}>{msg.from}</div>}
+                    {!isMe && <div style={{fontSize:10,color:C.sub,marginBottom:3,paddingLeft:2,fontWeight:600}}>{msg.from}{getUserBadge(msg.from)&&<span style={{marginLeft:3}}>{getUserBadge(msg.from)}</span>}</div>}
                     <div style={{padding:"10px 14px",borderRadius:isMe?"16px 16px 4px 16px":"16px 16px 16px 4px",background:isMe?`${C.purple}22`:C.card,border:`1px solid ${isMe?C.purple+"55":C.border}`,fontSize:13,color:C.text,lineHeight:1.5}}>
                       {msg.text}
                     </div>
@@ -4523,6 +4553,9 @@ function ProfileView({ user, onLogout, onUpdate, onGoSupport, onGoAdmin }) {
                 ? <input value={name} onChange={e=>setName(e.target.value)} style={{background:C.card2,border:`1px solid ${C.accent}44`,borderRadius:7,padding:"5px 10px",color:C.text,fontSize:18,fontWeight:700,outline:"none",width:"100%",fontFamily:C.head}}/>
                 : <div style={{display:"flex",alignItems:"center",gap:8}}>
                     <div style={{fontFamily:C.head,fontWeight:700,fontSize:22,color:C.text}}>{user.name}</div>
+                    {getReferralLevel(user.referralCount||0).badge && (
+                      <span title={getReferralLevel(user.referralCount||0).name} style={{fontSize:18,lineHeight:1}}>{getReferralLevel(user.referralCount||0).badge}</span>
+                    )}
                     {user.verified&&<span style={{background:"rgba(81,207,102,.15)",color:C.green,border:"1px solid rgba(81,207,102,.4)",borderRadius:6,padding:"2px 8px",fontSize:10,fontWeight:700}}>{t('profile.verified')}</span>}
                   </div>
               }
@@ -4560,6 +4593,67 @@ function ProfileView({ user, onLogout, onUpdate, onGoSupport, onGoAdmin }) {
             </div>
           ))}
         </div>
+
+        {/* Parrainage */}
+        {(() => {
+          const count    = user.referralCount||0;
+          const curLv    = getReferralLevel(count);
+          const nextLv   = REFERRAL_LEVELS.find(l=>l.min>count);
+          const progress = nextLv ? Math.round((count-curLv.min)/(nextLv.min-curLv.min)*100) : 100;
+          const code     = user.referralCode||makeReferralCode(user.name);
+          const link     = `https://rvf.vercel.app/?ref=${code}`;
+          const [copied,setCopied] = [false,()=>{}];
+          const share = () => {
+            if (navigator.share) { navigator.share({ title:"RVF", text:"Rejoins-moi sur RVF !", url:link }).catch(()=>{}); }
+            else { navigator.clipboard.writeText(link).catch(()=>{}); }
+          };
+          return (
+            <div style={{background:C.card,border:`1px solid ${curLv.color}44`,borderRadius:14,padding:16,marginBottom:16}}>
+              <div style={{fontSize:10,fontWeight:700,color:C.sub,textTransform:"uppercase",letterSpacing:1.5,marginBottom:12}}>🎁 Parrainage</div>
+
+              {/* Level badge row */}
+              <div style={{display:"flex",alignItems:"center",gap:12,marginBottom:14}}>
+                <div style={{width:52,height:52,borderRadius:14,background:`${curLv.color}18`,border:`2px solid ${curLv.color}55`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:28,flexShrink:0}}>
+                  {curLv.badge||"🏅"}
+                </div>
+                <div style={{flex:1,minWidth:0}}>
+                  <div style={{fontFamily:C.head,fontWeight:700,fontSize:16,color:C.text}}>
+                    Niveau {curLv.level} — {curLv.name}
+                  </div>
+                  <div style={{fontSize:12,color:C.sub,marginTop:2}}>{count} filleul{count!==1?"s":""} parrainé{count!==1?"s":""}</div>
+                  {nextLv ? (
+                    <div style={{marginTop:8}}>
+                      <div style={{display:"flex",justifyContent:"space-between",fontSize:10,color:C.sub,marginBottom:4}}>
+                        <span>{count}/{nextLv.min} pour {nextLv.badge} {nextLv.name}</span>
+                        <span style={{color:curLv.color,fontWeight:700}}>{progress}%</span>
+                      </div>
+                      <div style={{height:6,borderRadius:3,background:C.card2,overflow:"hidden"}}>
+                        <div style={{height:"100%",borderRadius:3,background:curLv.color,width:`${progress}%`,transition:"width .6s ease"}}/>
+                      </div>
+                    </div>
+                  ) : (
+                    <div style={{marginTop:6,fontSize:11,color:curLv.color,fontWeight:700}}>🏆 Niveau maximum atteint !</div>
+                  )}
+                </div>
+              </div>
+
+              {/* Levels legend */}
+              <div style={{display:"flex",gap:6,marginBottom:14,flexWrap:"wrap"}}>
+                {REFERRAL_LEVELS.map(l=>(
+                  <div key={l.level} style={{display:"flex",alignItems:"center",gap:4,padding:"3px 9px",borderRadius:20,background:count>=l.min&&l.badge?`${l.color}18`:C.card2,border:`1px solid ${count>=l.min&&l.badge?l.color+"55":C.border}`,opacity:count>=l.min?1:0.45}}>
+                    <span style={{fontSize:12}}>{l.badge||"🌱"}</span>
+                    <span style={{fontSize:10,fontWeight:600,color:count>=l.min?l.color:C.sub}}>{l.name}</span>
+                  </div>
+                ))}
+              </div>
+
+              {/* Share button */}
+              <Btn onClick={share} variant="ghost" full style={{fontSize:13,padding:"10px 14px"}}>
+                🔗 Inviter des amis · <span style={{opacity:.7,fontSize:11,fontFamily:"monospace"}}>{code}</span>
+              </Btn>
+            </div>
+          );
+        })()}
 
         {/* Palmarès */}
         {(() => {
@@ -5157,7 +5251,7 @@ function InvitesPanel({ user, onClose }) {
                       <div style={{display:"flex",gap:10,marginBottom:isPending?10:0,alignItems:"center"}}>
                         <Avatar name={req.fromName} size={44} color={C.accent} photo={fromUser?.avatar}/>
                         <div style={{flex:1,minWidth:0}}>
-                          <div style={{fontSize:13,fontWeight:700,color:C.text}}>{req.fromName}</div>
+                          <div style={{fontSize:13,fontWeight:700,color:C.text}}>{req.fromName}{getUserBadge(req.fromName)&&<span style={{marginLeft:4}}>{getUserBadge(req.fromName)}</span>}</div>
                           {fromUser?.city&&<div style={{fontSize:11,color:C.sub,marginTop:1}}>📍 {fromUser.city}</div>}
                           {fromUser?.level&&<div style={{marginTop:4}}><Badge label={fromUser.level} color={C.accent}/></div>}
                           <div style={{fontSize:10,color:C.sub,marginTop:4}}>{timeAgo(req.ts)}</div>
@@ -5191,7 +5285,7 @@ function InvitesPanel({ user, onClose }) {
                           <Avatar name={r.fromUserName} size={42} color={C.orange} photo={fromUser?.avatar}/>
                           <div style={{flex:1,minWidth:0}}>
                             <div style={{fontSize:11,fontWeight:700,color:C.orange,marginBottom:3}}>⚔️ DÉFI D'AMI</div>
-                            <div style={{fontSize:13,fontWeight:700,color:C.text}}>{r.fromUserName} <span style={{color:C.sub,fontWeight:400}}>{t('invites.challenges_from')}</span></div>
+                            <div style={{fontSize:13,fontWeight:700,color:C.text}}>{r.fromUserName}{getUserBadge(r.fromUserName)&&<span style={{marginLeft:4}}>{getUserBadge(r.fromUserName)}</span>} <span style={{color:C.sub,fontWeight:400}}>{t('invites.challenges_from')}</span></div>
                             {s&&<div style={{display:"flex",alignItems:"center",gap:5,marginTop:3}}><SportEmoji sport={s} size={13}/><span style={{fontSize:12,color:s.color,fontWeight:700}}>{s.label}</span></div>}
                             {r.terrainName&&<div style={{fontSize:12,fontWeight:700,color:C.text,marginTop:2}}>🏟️ {r.terrainName}{r.terrainCity?<span style={{color:C.accent,fontWeight:400}}> · {r.terrainCity}</span>:""}</div>}
                             <div style={{fontSize:12,color:C.sub,marginTop:1}}>📅 {r.day} · {r.hour}</div>
@@ -5249,7 +5343,7 @@ function InvitesPanel({ user, onClose }) {
                       <div style={{display:"flex",gap:10,marginBottom:10,alignItems:"center"}}>
                         <Avatar name={req.fromName} size={40} color={C.accent} photo={fromUser?.avatar}/>
                         <div style={{flex:1,minWidth:0}}>
-                          <div style={{fontSize:13,fontWeight:700,color:C.text}}>{req.fromName} <span style={{color:C.sub,fontWeight:400}}>veut rejoindre</span></div>
+                          <div style={{fontSize:13,fontWeight:700,color:C.text}}>{req.fromName}{getUserBadge(req.fromName)&&<span style={{marginLeft:4}}>{getUserBadge(req.fromName)}</span>} <span style={{color:C.sub,fontWeight:400}}>veut rejoindre</span></div>
                           <div style={{fontSize:13,fontWeight:700,color:C.accent,marginTop:1}}>{req.teamName}</div>
                           {req.note&&<div style={{fontSize:12,color:C.text,marginTop:5,background:C.card,borderRadius:8,padding:"6px 10px",fontStyle:"italic"}}>"{req.note}"</div>}
                           <div style={{fontSize:10,color:C.sub,marginTop:4}}>{timeAgo(req.ts)}</div>
