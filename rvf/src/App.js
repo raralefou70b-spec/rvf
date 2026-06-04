@@ -960,8 +960,8 @@ function ColoredName({ name, nameColor, style={} }) {
 }
 
 // Reusable badge: colored name + level chip + top earned badges
-function UserBadge({ name, size="md", showLevel=true, showInsignes=true, style={} }) {
-  const u = DB.find(x=>x.name===name) || { name:name||"?", xp:0, nameColor:null, referralCount:0, matchs:0, terrains:0, citiesVisited:0 };
+function UserBadge({ name, user: userProp, size="md", showLevel=true, showInsignes=true, style={} }) {
+  const u = userProp || DB.find(x=>x.name===name) || { name:name||"?", xp:0, nameColor:null, referralCount:0, matchs:0, terrains:0, citiesVisited:0 };
   const lvl   = getXpLevel(u.xp||0).level;
   const lvCol = lvl>=21?"#FFD700":lvl>=11?"#CC5DE8":lvl>=6?"#4DABF7":"#888";
   const earned = getEarnedBadges(u);
@@ -3766,7 +3766,7 @@ function UserProfileModal({ profile, currentUser, onClose, onGoToMessages }) {
             <Avatar name={profile.name} size={60} color={C.accent} photo={profile.avatar}/>
             <div>
               <div style={{display:"flex",alignItems:"center",gap:7,flexWrap:"wrap"}}>
-                <UserBadge name={profile.name} size="lg" showLevel showInsignes/>
+                <UserBadge name={profile.name} user={profile} size="lg" showLevel showInsignes/>
                 {profile.verified&&<span style={{background:"rgba(81,207,102,.15)",color:C.green,border:"1px solid rgba(81,207,102,.4)",borderRadius:5,padding:"2px 7px",fontSize:9,fontWeight:700}}>{t('profile.verified')}</span>}
               </div>
               <div style={{fontSize:12,color:C.sub,marginTop:3}}>📍 {profile.city}</div>
@@ -4080,7 +4080,7 @@ function SocialView({ user, terrains, onGoToMessages }) {
                       </div>
                       <div style={{flex:1,minWidth:0}}>
                         <div style={{display:"flex",alignItems:"center",gap:6,flexWrap:"wrap"}}>
-                          <UserBadge name={u.name} size="md" showLevel showInsignes/>
+                          <UserBadge name={u.name} user={u} size="md" showLevel showInsignes/>
                           {u.verified&&<span style={{fontSize:9,color:C.green,fontWeight:700}}>✅</span>}
                         </div>
                         <div style={{fontSize:11,color:C.sub,marginTop:2}}>📍 {u.city} · <span style={{color:C.accent}}>{u.level}</span></div>
@@ -4384,7 +4384,7 @@ function MessagingView({ user, openWith }) {
                           style={{display:"flex",alignItems:"center",gap:9,padding:"7px 10px",borderRadius:9,cursor:"pointer",fontFamily:C.font,background:C.card,border:`1px solid ${C.border}`,color:C.text,textAlign:"left",width:"100%"}}>
                           <Avatar name={p.name} size={28} color={p.isFriend?C.accent:C.sub} photo={DB.find(u=>u.name===p.name)?.avatar}/>
                           <div style={{flex:1,minWidth:0}}>
-                            <UserBadge name={p.name} size="sm" showInsignes={false}/>
+                            <UserBadge name={p.name} user={DB.find(x=>x.name===p.name)} size="sm" showInsignes={false}/>
                             {p.isFriend&&<div style={{fontSize:10,color:C.accent,marginTop:1}}>👥 Ami</div>}
                           </div>
                           <span style={{fontSize:11,color:C.sub}}>💬</span>
@@ -5935,8 +5935,30 @@ export default function App() {
 
   const addTerrain = async t => {
     if (user?.id) addXP(user.id, XP_REWARDS.terrain);
-    const { data: inserted, error } = await supabase.from('terrains').insert(t).select().single();
-    if (!error && inserted) { setTerrains(p => [...p, inserted]); return; }
+    const row = {
+      id:       t.id,
+      name:     t.name,
+      sport:    t.sport,
+      sports:   t.sports,
+      city:     t.city,
+      country:  t.country,
+      surface:  t.surface,
+      price:    t.price,
+      lights:   t.lights,
+      free:     t.free,
+      phone:    t.phone || null,
+      rating:   t.rating,
+      players:  t.players,
+      lat:      t.lat   || null,
+      lng:      t.lng   || null,
+      added_by: t.addedBy || user?.name || null,
+      photos:   t.photos || [],
+    };
+    const { data: inserted, error } = await supabase.from('terrains').insert(row).select().single();
+    if (!error && inserted) {
+      setTerrains(p => [...p, { ...inserted, addedBy: inserted.added_by }]);
+      return;
+    }
     // Fallback: Express backend
     try {
       const res = await fetch(`${API}/api/terrains`, {
