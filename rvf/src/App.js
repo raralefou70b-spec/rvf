@@ -5855,6 +5855,15 @@ function GlobeIcon() {
   );
 }
 
+// Maps Supabase snake_case profile fields → camelCase used throughout the app
+const normalizeProfile = p => p ? {
+  ...p,
+  nameColor:     p.nameColor     ?? p.name_color     ?? null,
+  referralCode:  p.referralCode  ?? p.referral_code  ?? null,
+  referralCount: p.referralCount ?? p.referral_count ?? 0,
+  citiesVisited: p.citiesVisited ?? p.cities_visited ?? 0,
+} : null;
+
 // ─── MAIN APP ─────────────────────────────────────────────────────────────────
 export default function App() {
   const {t, i18n: i18nApp} = useTranslation();
@@ -5877,7 +5886,7 @@ export default function App() {
     supabase.auth.getSession().then(async ({ data: { session } }) => {
       if (session?.user) {
         const { data: profile } = await supabase.from('profiles').select('*').eq('id', session.user.id).single();
-        if (profile) { setUser(profile); setScreen('app'); return; }
+        if (profile) { setUser(normalizeProfile(profile)); setScreen('app'); return; }
       }
       // Fallback: JWT
       const token = localStorage.getItem('rvf_token');
@@ -6002,8 +6011,16 @@ export default function App() {
     const dbU = DB.find(x=>x.id===u.id);
     if (dbU) { dbU.nameColor=u.nameColor; if(u.xp!==undefined) dbU.xp=u.xp; if(u.city!==undefined) dbU.city=u.city; }
     PROFILES_STORE.notify();
+    // Save to Supabase (snake_case columns)
+    supabase.from('profiles').update({
+      name_color:    u.nameColor    ?? null,
+      xp:            u.xp          ?? 0,
+      username:      u.name,
+      referral_count:u.referralCount ?? 0,
+    }).eq('id', u.id).catch(() => {});
+    // Also save via Express backend if token present
     const token = localStorage.getItem('rvf_token');
-    if (!token) return; // local mock mode — no persistence needed
+    if (!token) return;
     fetch(`${API}/api/auth/profile`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json', ...authHeader() },
