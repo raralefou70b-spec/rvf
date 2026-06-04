@@ -6061,14 +6061,22 @@ export default function App() {
       });
   },[]);
 
-  // Load terrains from Supabase; keep TERRAINS constant as fallback
+  // Load terrains from Supabase; merge with hardcoded TERRAINS as fallback
   useEffect(()=>{
     supabase.from('terrains').select('*').then(({ data, error }) => {
-      if (!error && data?.length) { setTerrains(data); return; }
+      if (!error && data) {
+        // Merge user-added terrains (UUID ids) with hardcoded demo terrains (numeric ids)
+        if (data.length > 0) {
+          setTerrains([...TERRAINS, ...data.map(t => ({ ...t, addedBy: t.added_by }))]);
+        }
+        // If Supabase returned empty array, keep TERRAINS initial state as-is
+        return;
+      }
+      console.warn('[RVF] Supabase terrains load error:', error?.message || error);
       // Fallback: Express backend
       fetch(`${API}/api/terrains`, { signal: AbortSignal.timeout(5000) })
         .then(r => r.ok ? r.json() : null)
-        .then(d => { if (d?.terrains?.length) setTerrains(d.terrains); })
+        .then(d => { if (d?.terrains?.length) setTerrains([...TERRAINS, ...d.terrains]); })
         .catch(() => {});
     });
   },[]);
@@ -6160,8 +6168,8 @@ export default function App() {
 
   const addTerrain = async t => {
     if (user?.id) addXP(user.id, XP_REWARDS.terrain);
+    // Never send a locally-generated numeric id — let Supabase auto-generate a UUID
     const row = {
-      id:       t.id,
       name:     t.name,
       sport:    t.sport,
       sports:   t.sports,
@@ -6184,6 +6192,7 @@ export default function App() {
       setTerrains(p => [...p, { ...inserted, addedBy: inserted.added_by }]);
       return;
     }
+    console.error('[RVF] Supabase terrain insert error:', error?.message || error);
     // Fallback: Express backend
     try {
       const res = await fetch(`${API}/api/terrains`, {
@@ -6194,7 +6203,7 @@ export default function App() {
       const data = await res.json();
       if (data.terrain) { setTerrains(p => [...p, data.terrain]); return; }
     } catch {}
-    // Offline fallback — add locally only
+    // Offline fallback — visible this session only
     setTerrains(p => [...p, t]);
   };
 
