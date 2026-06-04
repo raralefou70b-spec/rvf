@@ -5276,122 +5276,260 @@ function SupportView({ user, onBack }) {
 }
 
 // ─── ADMIN VIEW ────────────────────────────────────────────────────────────────
-function AdminView({ onBack, onMaintenanceChange }) {
-  const [tab,        setTab]        = useState("reports");
-  const [reports,    setReports]    = useState([]);
-  const [loading,    setLoading]    = useState(true);
-  const [maintActive, setMaintActive] = useState(false);
-  const [maintMsg,   setMaintMsg]   = useState("");
-  const [maintSaved, setMaintSaved] = useState(false);
-  const [blockEmail, setBlockEmail] = useState("");
-  const [blockResult,setBlockResult]= useState("");
+function AdminView({ onBack, onMaintenanceChange, terrains: appTerrains, onDeleteTerrain }) {
+  const [tab,         setTab]        = useState("stats");
+  const [loading,     setLoading]    = useState(true);
+  const [users,       setUsers]      = useState([]);
+  const [terrains,    setTerrains]   = useState([]);
+  const [reports,     setReports]    = useState([]);
+  const [maintActive, setMaintActive]= useState(false);
+  const [maintMsg,    setMaintMsg]   = useState("");
+  const [maintSaved,  setMaintSaved] = useState(false);
+  const [userSearch,  setUserSearch] = useState("");
+  const [terrainSearch,setTerrainSearch]= useState("");
+  const [actionMsg,   setActionMsg]  = useState("");
 
   useEffect(() => {
     Promise.all([
-      fetch(`${API}/api/admin/reports`, { headers: authHeader(), signal: AbortSignal.timeout(5000) })
-        .then(r => r.ok ? r.json() : null).catch(() => null),
+      supabase.from('profiles').select('*').then(r=>r.data||[]),
+      supabase.from('terrains').select('*').then(r=>r.data||[]),
+      fetch(`${API}/api/admin/reports`, { headers: authHeader(), signal: AbortSignal.timeout(4000) })
+        .then(r=>r.ok?r.json():null).catch(()=>null),
       fetch(`${API}/api/maintenance`, { signal: AbortSignal.timeout(3000) })
-        .then(r => r.ok ? r.json() : null).catch(() => null),
-    ]).then(([rData, mData]) => {
+        .then(r=>r.ok?r.json():null).catch(()=>null),
+    ]).then(([u, t, rData, mData]) => {
+      setUsers(u);
+      setTerrains(t.length ? t : appTerrains||[]);
       if (rData?.reports) setReports(rData.reports);
-      if (mData) { setMaintActive(mData.active); setMaintMsg(mData.message || ""); }
+      if (mData) { setMaintActive(mData.active); setMaintMsg(mData.message||""); }
       setLoading(false);
     });
   }, []);
 
+  const flash = msg => { setActionMsg(msg); setTimeout(()=>setActionMsg(""), 2500); };
+
+  const toggleBlock = async u => {
+    const newRole = u.role === "blocked" ? "user" : "blocked";
+    const { error } = await supabase.from('profiles').update({ role: newRole }).eq('id', u.id);
+    if (!error) {
+      setUsers(prev => prev.map(x => x.id===u.id ? {...x, role: newRole} : x));
+      flash(newRole==="blocked" ? `🚫 ${u.username||u.name} bloqué` : `✅ ${u.username||u.name} débloqué`);
+    } else flash("❌ Erreur Supabase");
+  };
+
+  const deleteTerrain = async t => {
+    const { error } = await supabase.from('terrains').delete().eq('id', t.id);
+    if (!error) {
+      setTerrains(prev => prev.filter(x=>x.id!==t.id));
+      if (onDeleteTerrain) onDeleteTerrain(t.id);
+      flash(`🗑️ Terrain "${t.name}" supprimé`);
+    } else flash("❌ Erreur suppression");
+  };
+
   const updateStatus = (id, status) => {
-    setReports(prev => prev.map(r => r.id === id ? { ...r, status } : r));
+    setReports(prev => prev.map(r => r.id===id ? {...r,status} : r));
     fetch(`${API}/api/admin/reports/${id}`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json", ...authHeader() },
-      body: JSON.stringify({ status }),
-    }).catch(() => {});
+      method:"PATCH", headers:{"Content-Type":"application/json",...authHeader()},
+      body: JSON.stringify({status}),
+    }).catch(()=>{});
   };
 
   const saveMaintenance = async () => {
     const res = await fetch(`${API}/api/admin/maintenance`, {
-      method: "PUT",
-      headers: { "Content-Type": "application/json", ...authHeader() },
-      body: JSON.stringify({ active: maintActive, message: maintMsg }),
-    }).catch(() => null);
+      method:"PUT", headers:{"Content-Type":"application/json",...authHeader()},
+      body: JSON.stringify({active:maintActive, message:maintMsg}),
+    }).catch(()=>null);
     if (res?.ok) {
       onMaintenanceChange(maintActive ? maintMsg : null);
-      setMaintSaved(true);
-      setTimeout(() => setMaintSaved(false), 2000);
+      setMaintSaved(true); setTimeout(()=>setMaintSaved(false), 2000);
     }
-  };
-
-  const doBlock = async () => {
-    if (!blockEmail.trim()) return;
-    const res = await fetch(`${API}/api/admin/block`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json", ...authHeader() },
-      body: JSON.stringify({ email: blockEmail.trim() }),
-    }).catch(() => null);
-    if (res?.ok) setBlockResult("✅ Utilisateur bloqué.");
-    else if (res?.status === 404) setBlockResult("❌ Email introuvable.");
-    else setBlockResult("❌ Erreur serveur.");
   };
 
   const STATUS_LABELS = { new:"🔵 Nouveau", in_progress:"🟡 En cours", resolved:"✅ Résolu" };
   const STATUS_COLORS = { new:C.blue, in_progress:C.orange, resolved:C.green };
 
+  const stats = [
+    ["👤", "Utilisateurs", users.length,          C.blue],
+    ["🏟️", "Terrains",     terrains.length,        C.accent],
+    ["⚽", "Matchs",       PAST_MATCHES.length,    C.orange],
+    ["👥", "Équipes",      TEAMS_DATA.length,      C.purple],
+    ["🚫", "Bloqués",      users.filter(u=>u.role==="blocked").length, C.red],
+    ["🔴", "Signalements", reports.filter(r=>r.status==="new").length, C.yellow],
+  ];
+
+  const filteredUsers    = users.filter(u=>{
+    const n = (u.username||u.name||"").toLowerCase();
+    const e = (u.email||"").toLowerCase();
+    const q = userSearch.toLowerCase();
+    return !q || n.includes(q) || e.includes(q);
+  });
+  const filteredTerrains = terrains.filter(t =>
+    !terrainSearch || (t.name||"").toLowerCase().includes(terrainSearch.toLowerCase()) || (t.city||"").toLowerCase().includes(terrainSearch.toLowerCase())
+  );
+
   const tabs = [
+    { id:"stats",       label:"📊 Stats"     },
+    { id:"users",       label:"👤 Utilisateurs", count: users.filter(u=>u.role==="blocked").length||0 },
+    { id:"terrains",    label:"🏟️ Terrains"  },
     { id:"reports",     label:"📋 Signalements", count: reports.filter(r=>r.status==="new").length },
     { id:"maintenance", label:"🔧 Maintenance" },
-    { id:"block",       label:"🚫 Blocage" },
   ];
 
   return (
     <div style={{flex:1,overflowY:"auto",padding:24}}>
-      <div style={{maxWidth:600,margin:"0 auto"}}>
-        <button onClick={onBack}
-          style={{display:"flex",alignItems:"center",gap:6,background:"none",border:"none",color:C.sub,fontSize:13,cursor:"pointer",fontFamily:C.font,marginBottom:16,padding:0}}>
+      <div style={{maxWidth:700,margin:"0 auto"}}>
+        <button onClick={onBack} style={{display:"flex",alignItems:"center",gap:6,background:"none",border:"none",color:C.sub,fontSize:13,cursor:"pointer",fontFamily:C.font,marginBottom:16,padding:0}}>
           ← Profil
         </button>
-        <div style={{fontFamily:C.head,fontWeight:700,fontSize:22,color:C.accent,marginBottom:20}}>⚙️ Panneau Admin</div>
+        <div style={{fontFamily:C.head,fontWeight:700,fontSize:22,color:C.accent,marginBottom:4}}>⚙️ Panneau Admin</div>
+        {actionMsg && <div style={{background:`${C.green}18`,border:`1px solid ${C.green}44`,borderRadius:8,padding:"8px 14px",fontSize:13,color:C.green,fontWeight:600,marginBottom:12}}>{actionMsg}</div>}
 
         {/* Tabs */}
-        <div style={{display:"flex",gap:8,marginBottom:20}}>
-          {tabs.map(t => (
+        <div style={{display:"flex",gap:6,marginBottom:20,overflowX:"auto",paddingBottom:2}}>
+          {tabs.map(t=>(
             <button key={t.id} onClick={()=>setTab(t.id)}
-              style={{flex:1,padding:"9px 6px",borderRadius:10,border:`1px solid ${tab===t.id?C.accent+"44":C.border}`,background:tab===t.id?C.aLow:C.card,color:tab===t.id?C.accent:C.sub,fontSize:11,fontWeight:700,cursor:"pointer",fontFamily:C.font,position:"relative"}}>
+              style={{flexShrink:0,padding:"8px 12px",borderRadius:10,border:`1px solid ${tab===t.id?C.accent+"55":C.border}`,background:tab===t.id?C.aLow:C.card,color:tab===t.id?C.accent:C.sub,fontSize:11,fontWeight:700,cursor:"pointer",fontFamily:C.font,whiteSpace:"nowrap",position:"relative"}}>
               {t.label}
-              {t.count>0 && <span style={{marginLeft:4,background:C.red,color:"#fff",borderRadius:10,padding:"1px 5px",fontSize:9,fontWeight:800}}>{t.count}</span>}
+              {t.count>0&&<span style={{marginLeft:4,background:C.red,color:"#fff",borderRadius:10,padding:"1px 5px",fontSize:9,fontWeight:800}}>{t.count}</span>}
             </button>
           ))}
         </div>
 
-        {/* Reports */}
-        {tab === "reports" && (
-          loading
-            ? <div style={{color:C.sub,textAlign:"center",padding:40}}>Chargement...</div>
-            : reports.length === 0
-              ? <div style={{color:C.sub,textAlign:"center",padding:40}}>Aucun signalement.</div>
-              : <div style={{display:"flex",flexDirection:"column",gap:10}}>
-                  {reports.map(r => (
-                    <div key={r.id} style={{background:C.card,border:`1px solid ${STATUS_COLORS[r.status]||C.border}22`,borderRadius:12,padding:14}}>
-                      <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",gap:8,marginBottom:8}}>
-                        <div>
-                          <span style={{fontSize:10,fontWeight:700,color:r.type==="hack"?C.red:C.blue,background:r.type==="hack"?`${C.red}18`:`${C.blue}18`,padding:"2px 8px",borderRadius:6,marginRight:8}}>
-                            {r.type==="hack"?"🔴 HACK":"🐛 BUG"}
-                          </span>
-                          <span style={{fontSize:11,color:C.sub}}>{r.user_name}</span>
-                        </div>
-                        <span style={{fontSize:10,color:C.sub,flexShrink:0}}>{new Date(r.created_at).toLocaleDateString("fr-FR")}</span>
-                      </div>
-                      <div style={{fontSize:13,color:C.text,lineHeight:1.5,marginBottom:10}}>{r.description}</div>
-                      <select value={r.status} onChange={e=>updateStatus(r.id,e.target.value)}
-                        style={{background:C.card2,border:`1px solid ${STATUS_COLORS[r.status]||C.border}55`,borderRadius:8,padding:"5px 10px",color:STATUS_COLORS[r.status]||C.text,fontSize:11,fontWeight:700,cursor:"pointer",fontFamily:C.font,outline:"none"}}>
-                        {Object.entries(STATUS_LABELS).map(([v,l])=><option key={v} value={v}>{l}</option>)}
-                      </select>
-                    </div>
-                  ))}
+        {loading && <div style={{color:C.sub,textAlign:"center",padding:40,fontSize:14}}>⏳ Chargement...</div>}
+
+        {/* ── STATS ── */}
+        {!loading && tab==="stats" && (
+          <div>
+            <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:10,marginBottom:20}}>
+              {stats.map(([icon,label,val,color])=>(
+                <div key={label} style={{background:C.card,border:`1px solid ${color}22`,borderRadius:14,padding:16,textAlign:"center"}}>
+                  <div style={{fontSize:24,marginBottom:4}}>{icon}</div>
+                  <div style={{fontFamily:C.head,fontWeight:800,fontSize:28,color}}>{val}</div>
+                  <div style={{fontSize:11,color:C.sub,marginTop:2}}>{label}</div>
                 </div>
+              ))}
+            </div>
+            <div style={{background:C.card,border:`1px solid ${C.border}`,borderRadius:14,padding:16}}>
+              <div style={{fontSize:11,fontWeight:700,color:C.sub,textTransform:"uppercase",letterSpacing:1,marginBottom:10}}>Répartition des rôles</div>
+              {[["admin","Admin 👑",C.yellow],["user","Utilisateurs",C.accent],["blocked","Bloqués 🚫",C.red]].map(([role,label,color])=>{
+                const count = users.filter(u=>u.role===role).length;
+                const pct   = users.length ? Math.round(count/users.length*100) : 0;
+                return (
+                  <div key={role} style={{marginBottom:10}}>
+                    <div style={{display:"flex",justifyContent:"space-between",fontSize:12,marginBottom:4}}>
+                      <span style={{color}}>{label}</span>
+                      <span style={{color:C.sub,fontWeight:700}}>{count} ({pct}%)</span>
+                    </div>
+                    <div style={{height:6,borderRadius:3,background:C.card2,overflow:"hidden"}}>
+                      <div style={{height:"100%",width:`${pct}%`,background:color,borderRadius:3,transition:"width .5s"}}/>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
         )}
 
-        {/* Maintenance */}
-        {tab === "maintenance" && (
+        {/* ── UTILISATEURS ── */}
+        {!loading && tab==="users" && (
+          <div>
+            <div style={{position:"relative",marginBottom:12}}>
+              <input value={userSearch} onChange={e=>setUserSearch(e.target.value)} placeholder="Rechercher par nom ou email…"
+                style={{width:"100%",background:C.card,border:`1px solid ${C.border}`,borderRadius:9,padding:"9px 12px 9px 38px",color:C.text,fontSize:13,outline:"none",fontFamily:C.font,boxSizing:"border-box"}}/>
+              <span style={{position:"absolute",left:12,top:"50%",transform:"translateY(-50%)",opacity:.4}}>🔍</span>
+            </div>
+            <div style={{fontSize:11,color:C.sub,marginBottom:8,fontWeight:700}}>{filteredUsers.length} utilisateur{filteredUsers.length!==1?"s":""}</div>
+            <div style={{display:"flex",flexDirection:"column",gap:8}}>
+              {filteredUsers.map(u=>{
+                const name  = u.username || u.name || "?";
+                const isAdm = u.role==="admin";
+                const isBlk = u.role==="blocked";
+                return (
+                  <div key={u.id} style={{background:C.card,border:`1px solid ${isBlk?C.red+"33":isAdm?C.yellow+"33":C.border}`,borderRadius:12,padding:"11px 14px",display:"flex",alignItems:"center",gap:10}}>
+                    <Avatar name={name} size={36} color={isAdm?C.yellow:isBlk?C.red:C.accent}/>
+                    <div style={{flex:1,minWidth:0}}>
+                      <div style={{display:"flex",alignItems:"center",gap:6,flexWrap:"wrap"}}>
+                        <span style={{fontSize:13,fontWeight:700,color:isBlk?C.red:C.text}}>{name}</span>
+                        {isAdm && <span style={{fontSize:9,background:`${C.yellow}20`,color:C.yellow,border:`1px solid ${C.yellow}44`,borderRadius:4,padding:"1px 6px",fontWeight:700}}>👑 Admin</span>}
+                        {isBlk && <span style={{fontSize:9,background:`${C.red}20`,color:C.red,border:`1px solid ${C.red}44`,borderRadius:4,padding:"1px 6px",fontWeight:700}}>🚫 Bloqué</span>}
+                      </div>
+                      <div style={{fontSize:11,color:C.sub,marginTop:2}}>{u.email||"—"} · {u.city||"?"}</div>
+                      <div style={{fontSize:10,color:C.sub,marginTop:1}}>XP: {u.xp||0} · Terrains: {u.terrains||0} · Matchs: {u.matchs||0}</div>
+                    </div>
+                    {!isAdm && (
+                      <button onClick={()=>toggleBlock(u)}
+                        style={{flexShrink:0,padding:"6px 12px",borderRadius:8,border:`1px solid ${isBlk?C.green+"55":C.red+"55"}`,background:isBlk?`${C.green}12`:`${C.red}12`,color:isBlk?C.green:C.red,fontSize:11,fontWeight:700,cursor:"pointer",fontFamily:C.font}}>
+                        {isBlk?"✅ Débloquer":"🚫 Bloquer"}
+                      </button>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
+
+        {/* ── TERRAINS ── */}
+        {!loading && tab==="terrains" && (
+          <div>
+            <div style={{position:"relative",marginBottom:12}}>
+              <input value={terrainSearch} onChange={e=>setTerrainSearch(e.target.value)} placeholder="Rechercher par nom ou ville…"
+                style={{width:"100%",background:C.card,border:`1px solid ${C.border}`,borderRadius:9,padding:"9px 12px 9px 38px",color:C.text,fontSize:13,outline:"none",fontFamily:C.font,boxSizing:"border-box"}}/>
+              <span style={{position:"absolute",left:12,top:"50%",transform:"translateY(-50%)",opacity:.4}}>🔍</span>
+            </div>
+            <div style={{fontSize:11,color:C.sub,marginBottom:8,fontWeight:700}}>{filteredTerrains.length} terrain{filteredTerrains.length!==1?"s":""}</div>
+            <div style={{display:"flex",flexDirection:"column",gap:8}}>
+              {filteredTerrains.map(t=>{
+                const s = SPORTS.find(x=>x.id===t.sport);
+                return (
+                  <div key={t.id} style={{background:C.card,border:`1px solid ${C.border}`,borderRadius:12,padding:"11px 14px",display:"flex",alignItems:"center",gap:10}}>
+                    <div style={{width:38,height:38,borderRadius:10,background:`${s?.color||C.accent}18`,border:`1px solid ${s?.color||C.accent}30`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:18,flexShrink:0}}>
+                      {s ? <SportEmoji sport={s} size={18}/> : "🏟️"}
+                    </div>
+                    <div style={{flex:1,minWidth:0}}>
+                      <div style={{fontSize:13,fontWeight:700,color:C.text}}>{t.name}</div>
+                      <div style={{fontSize:11,color:C.sub,marginTop:1}}>📍 {t.city}, {t.country} · {t.surface} · {t.price}</div>
+                      {(t.added_by||t.addedBy) && <div style={{fontSize:10,color:C.sub,marginTop:1}}>Ajouté par : {t.added_by||t.addedBy}</div>}
+                    </div>
+                    <button onClick={()=>{ if(window.confirm(`Supprimer "${t.name}" ?`)) deleteTerrain(t); }}
+                      style={{flexShrink:0,padding:"6px 11px",borderRadius:8,border:`1px solid ${C.red}44`,background:`${C.red}12`,color:C.red,fontSize:11,fontWeight:700,cursor:"pointer",fontFamily:C.font}}>
+                      🗑️
+                    </button>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
+
+        {/* ── SIGNALEMENTS ── */}
+        {!loading && tab==="reports" && (
+          reports.length===0
+            ? <div style={{color:C.sub,textAlign:"center",padding:40}}>Aucun signalement.</div>
+            : <div style={{display:"flex",flexDirection:"column",gap:10}}>
+                {reports.map(r=>(
+                  <div key={r.id} style={{background:C.card,border:`1px solid ${STATUS_COLORS[r.status]||C.border}22`,borderRadius:12,padding:14}}>
+                    <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",gap:8,marginBottom:8}}>
+                      <div>
+                        <span style={{fontSize:10,fontWeight:700,color:r.type==="hack"?C.red:C.blue,background:r.type==="hack"?`${C.red}18`:`${C.blue}18`,padding:"2px 8px",borderRadius:6,marginRight:8}}>
+                          {r.type==="hack"?"🔴 HACK":"🐛 BUG"}
+                        </span>
+                        <span style={{fontSize:11,color:C.sub}}>{r.user_name}</span>
+                      </div>
+                      <span style={{fontSize:10,color:C.sub,flexShrink:0}}>{new Date(r.created_at).toLocaleDateString("fr-FR")}</span>
+                    </div>
+                    <div style={{fontSize:13,color:C.text,lineHeight:1.5,marginBottom:10}}>{r.description}</div>
+                    <select value={r.status} onChange={e=>updateStatus(r.id,e.target.value)}
+                      style={{background:C.card2,border:`1px solid ${STATUS_COLORS[r.status]||C.border}55`,borderRadius:8,padding:"5px 10px",color:STATUS_COLORS[r.status]||C.text,fontSize:11,fontWeight:700,cursor:"pointer",fontFamily:C.font,outline:"none"}}>
+                      {Object.entries(STATUS_LABELS).map(([v,l])=><option key={v} value={v}>{l}</option>)}
+                    </select>
+                  </div>
+                ))}
+              </div>
+        )}
+
+        {/* ── MAINTENANCE ── */}
+        {!loading && tab==="maintenance" && (
           <div style={{background:C.card,border:`1px solid ${C.border}`,borderRadius:14,padding:20}}>
             <div style={{fontSize:13,fontWeight:700,color:C.text,marginBottom:16}}>Mode maintenance</div>
             <div style={{display:"flex",alignItems:"center",gap:12,marginBottom:16}}>
@@ -5407,23 +5545,8 @@ function AdminView({ onBack, onMaintenanceChange }) {
               placeholder="Message affiché à tous les utilisateurs..."
               style={{width:"100%",background:C.card2,border:`1px solid ${C.border}`,borderRadius:10,padding:"10px 12px",color:C.text,fontSize:13,fontFamily:C.font,outline:"none",resize:"vertical",marginBottom:12}}/>
             <Btn onClick={saveMaintenance} style={{background:maintActive?C.orange:C.accent}}>
-              {maintSaved ? "✅ Sauvegardé !" : "Sauvegarder"}
+              {maintSaved?"✅ Sauvegardé !":"Sauvegarder"}
             </Btn>
-          </div>
-        )}
-
-        {/* Block */}
-        {tab === "block" && (
-          <div style={{background:C.card,border:`1px solid ${C.border}`,borderRadius:14,padding:20}}>
-            <div style={{fontSize:13,fontWeight:700,color:C.text,marginBottom:6}}>Bloquer un utilisateur</div>
-            <div style={{fontSize:12,color:C.sub,marginBottom:16}}>L'utilisateur ne pourra plus se connecter.</div>
-            <input value={blockEmail} onChange={e=>{setBlockEmail(e.target.value);setBlockResult("");}}
-              placeholder="Email de l'utilisateur..."
-              style={{width:"100%",background:C.card2,border:`1px solid ${C.border}`,borderRadius:9,padding:"10px 12px",color:C.text,fontSize:13,fontFamily:C.font,outline:"none",marginBottom:12}}/>
-            {blockResult && (
-              <div style={{marginBottom:12,fontSize:13,color:blockResult.startsWith("✅")?C.green:C.red,fontWeight:600}}>{blockResult}</div>
-            )}
-            <Btn onClick={doBlock} variant="danger">🚫 Bloquer cet utilisateur</Btn>
           </div>
         )}
       </div>
@@ -5862,6 +5985,7 @@ const normalizeProfile = p => p ? {
   referralCode:  p.referralCode  ?? p.referral_code  ?? null,
   referralCount: p.referralCount ?? p.referral_count ?? 0,
   citiesVisited: p.citiesVisited ?? p.cities_visited ?? 0,
+  role:          p.role          ?? 'user',
 } : null;
 
 // ─── MAIN APP ─────────────────────────────────────────────────────────────────
@@ -6196,7 +6320,7 @@ export default function App() {
         {screen==="app" && view==="social"   && <SocialView user={user} terrains={terrains} onGoToMessages={goToMessages}/>}
         {screen==="app" && view==="profile"  && <ProfileView user={user} onLogout={doLogout} onUpdate={doUpdate} onGoSupport={()=>setView("support")} onGoAdmin={()=>setView("admin")}/>}
         {screen==="app" && view==="support"  && <SupportView user={user} onBack={()=>setView("profile")}/>}
-        {screen==="app" && view==="admin" && user?.role==="admin" && <AdminView onBack={()=>setView("profile")} onMaintenanceChange={msg=>setMaintenanceBanner(msg)}/>}
+        {screen==="app" && view==="admin" && user?.role==="admin" && <AdminView onBack={()=>setView("profile")} onMaintenanceChange={msg=>setMaintenanceBanner(msg)} terrains={terrains} onDeleteTerrain={deleteTerrain}/>}
 
         {showInvites && user && <InvitesPanel user={user} onClose={()=>setShowInvites(false)}/>}
       </div>
