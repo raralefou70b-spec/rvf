@@ -2528,7 +2528,7 @@ function DispoTab({ terrain, user, sp }) {
             {nowPlayers.map(p=>(
               <div key={p.name} style={{display:"flex",alignItems:"center",gap:7,background:C.card2,borderRadius:20,padding:"4px 10px 4px 5px"}}>
                 <Avatar name={p.name} size={22} color={sp?.color}/>
-                <span style={{fontSize:11,fontWeight:600,color:C.text}}>{p.name}</span>
+                <UserBadge name={p.name} user={DB.find(x=>x.name===p.name)} size="sm" showLevel={false} showInsignes={false}/>
                 <span style={{fontSize:10,color:C.sub}}>{timeAgo(p.at)}</span>
               </div>
             ))}
@@ -2631,7 +2631,10 @@ function PhotosTab({ terrain, user, sp }) {
             <div style={{display:"flex",alignItems:"center",gap:9,padding:"10px 12px"}}>
               <Avatar name={photo.author} size={30} color={sp?.color}/>
               <div style={{flex:1}}>
-                <div style={{fontSize:12,fontWeight:700,color:C.text}}>{photo.author} <span style={{fontSize:13}}>{photo.flag||"🌍"}</span></div>
+                <div style={{fontSize:12,fontWeight:700,color:C.text,display:"flex",alignItems:"center",gap:4}}>
+                  <UserBadge name={photo.author} user={DB.find(x=>x.name===photo.author)} size="sm" showLevel={false} showInsignes={false}/>
+                  <span style={{fontSize:13}}>{photo.flag||"🌍"}</span>
+                </div>
                 <div style={{fontSize:10,color:C.sub}}>{timeAgo(photo.postedAt)}</div>
               </div>
               <span style={{fontSize:18}}>{photo.emoji||sp?.emoji}</span>
@@ -2720,7 +2723,10 @@ function InviteTab({ terrain, user, sp }) {
                 style={{background:isSel?`${sp?.color}15`:C.card2,border:`1.5px solid ${isSel?sp?.color:C.border}`,borderRadius:12,padding:"10px 14px",cursor:"pointer",display:"flex",alignItems:"center",gap:12}}>
                 <Avatar name={p.name} size={36} color={isSel?sp?.color:C.sub}/>
                 <div style={{flex:1}}>
-                  <div style={{fontSize:13,fontWeight:700,color:C.text}}>{p.name} {p.flag}</div>
+                  <div style={{fontSize:13,fontWeight:700,color:C.text,display:"flex",alignItems:"center",gap:4}}>
+                    <UserBadge name={p.name} user={DB.find(x=>x.name===p.name)} size="sm" showLevel showInsignes/>
+                    {p.flag}
+                  </div>
                   <div style={{fontSize:11,color:C.sub}}>Joueur RVF · En ligne</div>
                 </div>
                 <div style={{width:22,height:22,borderRadius:"50%",border:`2px solid ${isSel?sp?.color:C.border}`,background:isSel?`${sp?.color}22`:"transparent",display:"flex",alignItems:"center",justifyContent:"center",fontSize:13,color:sp?.color}}>
@@ -3912,7 +3918,7 @@ function FriendChallengeModal({ user, friend, terrains, onClose }) {
       <div style={{background:C.card,border:`1px solid ${C.accent}`,borderRadius:20,padding:32,maxWidth:320,width:"100%",textAlign:"center"}}>
         <div style={{fontSize:48,marginBottom:12}}>⚔️</div>
         <div style={{fontFamily:C.head,fontWeight:700,fontSize:20,color:C.accent,marginBottom:8}}>Défi envoyé !</div>
-        <div style={{fontSize:13,color:C.sub}}>Ton défi a été envoyé à <strong style={{color:C.text}}>{friend.name}</strong>.</div>
+        <div style={{fontSize:13,color:C.sub,display:"flex",alignItems:"center",gap:4,flexWrap:"wrap",justifyContent:"center"}}>Ton défi a été envoyé à <UserBadge name={friend.name} user={friend} size="sm" showLevel={false} showInsignes={false}/>.</div>
       </div>
     </div>
   );
@@ -3923,7 +3929,7 @@ function FriendChallengeModal({ user, friend, terrains, onClose }) {
       <div style={{background:C.card,border:`1px solid ${C.border}`,borderRadius:20,width:"100%",maxWidth:400,maxHeight:"85vh",display:"flex",flexDirection:"column"}}>
         <div style={{padding:"16px 20px",borderBottom:`1px solid ${C.border}`,display:"flex",justifyContent:"space-between",alignItems:"center",flexShrink:0}}>
           <div>
-            <div style={{fontFamily:C.head,fontWeight:700,fontSize:18,color:C.text}}>⚔️ Défier {friend.name}</div>
+            <div style={{fontFamily:C.head,fontWeight:700,fontSize:18,color:C.text,display:"flex",alignItems:"center",gap:6}}>⚔️ Défier <UserBadge name={friend.name} user={friend} size="md" showLevel showInsignes/></div>
             <div style={{fontSize:11,color:C.sub,marginTop:2}}>Défi direct · ami</div>
           </div>
           <button onClick={onClose} style={{background:C.card2,border:`1px solid ${C.border}`,borderRadius:8,width:32,height:32,cursor:"pointer",color:C.sub,fontSize:18,lineHeight:1}}>✕</button>
@@ -4485,7 +4491,7 @@ function MessagingView({ user, openWith }) {
             </div>
             <div style={{flex:1,cursor:"pointer"}} onClick={()=>openProfile(selOther)}>
               <div style={{fontSize:15,fontWeight:700,color:C.text,display:"flex",alignItems:"center",gap:6}}>
-                {selOther}
+                <UserBadge name={selOther} user={DB.find(x=>x.name===selOther)} size="md" showLevel showInsignes/>
                 <span style={{fontSize:9,color:C.sub,fontWeight:400,border:`1px solid ${C.border}`,borderRadius:5,padding:"1px 5px"}}>voir profil</span>
               </div>
               <div style={{display:"flex",alignItems:"center",gap:6}}>
