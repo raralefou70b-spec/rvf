@@ -3049,11 +3049,11 @@ function TeamRosterModal({ team, onClose, currentUser, onGoToMessages }) {
                     <div style={{display:"flex",alignItems:"center",gap:10}}>
                       <Avatar name={m.name} size={38} color={m.captain?C.yellow:C.accent} photo={dbUser?.avatar}/>
                       <div style={{flex:1,minWidth:0}}>
-                        <div style={{fontSize:13,fontWeight:700,color:C.text,display:"flex",alignItems:"center",gap:5,flexWrap:"wrap"}}>
-                          {m.name}
+                        <div style={{display:"flex",alignItems:"center",gap:5,flexWrap:"wrap"}}>
+                          <UserBadge name={m.name} user={DB.find(x=>x.id===m.id)||undefined} size="sm" showLevel showInsignes/>
                           {m.captain && <span style={{fontSize:9,background:`${C.yellow}20`,color:C.yellow,border:`1px solid ${C.yellow}40`,borderRadius:4,padding:"1px 5px",fontWeight:700}}>👑 Cap.</span>}
                         </div>
-                        <div style={{fontSize:11,color:C.sub}}>📍 {m.city} · <span style={{color:C.accent}}>{m.level}</span></div>
+                        <div style={{fontSize:11,color:C.sub,marginTop:2}}>📍 {m.city} · <span style={{color:C.accent}}>{m.level}</span></div>
                       </div>
                       {dbUser?.sports?.length>0 && (
                         <div style={{display:"flex",gap:3,flexShrink:0}}>
@@ -4176,8 +4176,8 @@ function SocialView({ user, terrains, onGoToMessages }) {
                   onMouseLeave={e=>e.currentTarget.style.borderColor=C.border}>
                   <Avatar name={u.name} size={46} color={C.accent} photo={u.avatar}/>
                   <div style={{flex:1,minWidth:0}}>
-                    <div style={{display:"flex",alignItems:"center",gap:6}}>
-                      <span style={{fontSize:14,fontWeight:700,color:C.text}}>{u.name}</span>
+                    <div style={{display:"flex",alignItems:"center",gap:6,flexWrap:"wrap"}}>
+                      <UserBadge name={u.name} user={u} size="md" showLevel showInsignes/>
                       {u.verified&&<span style={{fontSize:9,color:C.green,fontWeight:700}}>✅</span>}
                     </div>
                     <div style={{fontSize:11,color:C.sub,marginTop:2,display:"flex",alignItems:"center",gap:5,flexWrap:"wrap"}}>
