@@ -3286,6 +3286,8 @@ function TeamsView({ user, terrains, onGoToMessages }) {
   const [teams,setTeams]               = useState(TEAMS_DATA);
   const [filter,setFilter]             = useState("all");
   const [cityFilter,setCityFilter]     = useState("");
+  const mySports = user?.sports?.length ? user.sports : null;
+  const [mySportsOnly,setMySportsOnly] = useState(!!mySports);
   const [joinModal,setJoinModal]       = useState(null);
   const [joinNote,setJoinNote]         = useState("");
   const [rosterTeam,setRosterTeam]     = useState(null);
@@ -3325,6 +3327,7 @@ function TeamsView({ user, terrains, onGoToMessages }) {
 
   const filtered = teams.filter(t=>
     (filter==="all"||t.sport===filter) &&
+    (!mySportsOnly||!mySports||mySports.includes(t.sport)) &&
     (!cityFilter.trim()||(t.city||"").toLowerCase().includes(cityFilter.trim().toLowerCase()))
   ).sort((a,b)=>{
     if (cityFilter.trim()) return 0;
@@ -3390,9 +3393,17 @@ function TeamsView({ user, terrains, onGoToMessages }) {
                 <span style={{position:"absolute",left:9,top:"50%",transform:"translateY(-50%)",opacity:.4,fontSize:13}}>📍</span>
                 {cityFilter && <button onClick={()=>setCityFilter("")} style={{position:"absolute",right:8,top:"50%",transform:"translateY(-50%)",background:"none",border:"none",color:C.sub,cursor:"pointer",fontSize:12,lineHeight:1}}>✕</button>}
               </div>
-              <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
+              <div style={{display:"flex",gap:6,flexWrap:"wrap",alignItems:"center"}}>
+                {mySports && (
+                  <button onClick={()=>setMySportsOnly(p=>!p)}
+                    style={{padding:"5px 11px",borderRadius:20,border:`1.5px solid ${mySportsOnly?C.accent:C.border}`,background:mySportsOnly?C.aLow:"transparent",color:mySportsOnly?C.accent:C.sub,fontSize:11,fontWeight:700,cursor:"pointer",fontFamily:C.font,whiteSpace:"nowrap",transition:"all .15s"}}>
+                    {mySportsOnly?"⚽ Mes sports":"🌐 Voir tous"}
+                  </button>
+                )}
                 <Chip active={filter==="all"} onClick={()=>setFilter("all")}>Tous</Chip>
-                {SPORTS.map(s=><Chip key={s.id} active={filter===s.id} onClick={()=>setFilter(s.id)} color={s.color}><span style={{display:"inline-flex",alignItems:"center",gap:4}}><SportEmoji sport={s} size={12}/>{s.label}</span></Chip>)}
+                {(mySportsOnly&&mySports ? SPORTS.filter(s=>mySports.includes(s.id)) : SPORTS).map(s=>(
+                  <Chip key={s.id} active={filter===s.id} onClick={()=>setFilter(s.id)} color={s.color}><span style={{display:"inline-flex",alignItems:"center",gap:4}}><SportEmoji sport={s} size={12}/>{s.label}</span></Chip>
+                ))}
               </div>
             </div>
 
@@ -4620,12 +4631,22 @@ function ProfileView({ user, onLogout, onUpdate, onGoSupport, onGoAdmin }) {
   const [name,setName]       = useState(user.name);
   const [bio,setBio]         = useState(user.bio||"");
   const [level,setLevel]     = useState(user.level||"Amateur");
+  const [city,setCity]       = useState(user.city||"");
+  const [citySug,setCitySug] = useState([]);
   const fileRef              = useRef();
   useStore(BOOK);
   useStore(MATCH_SCORE);
   useStore(XP_STORE);
 
-  const save = () => { onUpdate({...user,name,bio,level}); setEditing(false); };
+  const onCityInput = v => {
+    setCity(v);
+    if (v.length < 2) { setCitySug([]); return; }
+    const q = v.toLowerCase();
+    setCitySug(WORLD_CITIES.filter(c => c.toLowerCase().startsWith(q)).slice(0, 6));
+  };
+  const pickCity = c => { setCity(c); setCitySug([]); };
+
+  const save = () => { onUpdate({...user, name, bio, level, city}); setEditing(false); setCitySug([]); };
   const toggleProfileSport = id => {
     const cur = user.sports||[];
     onUpdate({...user, sports: cur.includes(id) ? cur.filter(x=>x!==id) : [...cur,id]});
@@ -4657,7 +4678,30 @@ function ProfileView({ user, onLogout, onUpdate, onGoSupport, onGoAdmin }) {
                     {user.verified&&<span style={{background:"rgba(81,207,102,.15)",color:C.green,border:"1px solid rgba(81,207,102,.4)",borderRadius:6,padding:"2px 8px",fontSize:10,fontWeight:700}}>{t('profile.verified')}</span>}
                   </div>
               }
-              <div style={{fontSize:12,color:C.sub,marginTop:3}}>📍 {user.city}</div>
+              {editing
+                ? <div style={{position:"relative",marginTop:6}}>
+                    <div style={{display:"flex",alignItems:"center",gap:6,background:C.card2,border:`1px solid ${C.accent}44`,borderRadius:8,padding:"5px 10px"}}>
+                      <span style={{fontSize:13}}>📍</span>
+                      <input value={city} onChange={e=>onCityInput(e.target.value)}
+                        placeholder="Votre ville…"
+                        style={{background:"none",border:"none",outline:"none",color:C.text,fontSize:13,flex:1,fontFamily:C.font,minWidth:0}}/>
+                      {city && <button onClick={()=>pickCity("")} style={{background:"none",border:"none",color:C.sub,cursor:"pointer",fontSize:12,padding:0,lineHeight:1}}>✕</button>}
+                    </div>
+                    {citySug.length > 0 && (
+                      <div style={{position:"absolute",top:"100%",left:0,right:0,background:C.card2,border:`1px solid ${C.border}`,borderRadius:10,zIndex:200,boxShadow:"0 8px 24px #0008",overflow:"hidden",marginTop:3}}>
+                        {citySug.map(s=>(
+                          <button key={s} onClick={()=>pickCity(s)}
+                            style={{display:"block",width:"100%",textAlign:"left",background:"none",border:"none",borderBottom:`1px solid ${C.border}`,padding:"9px 13px",color:C.text,fontSize:13,cursor:"pointer",fontFamily:C.font}}
+                            onMouseEnter={e=>e.currentTarget.style.background=C.card}
+                            onMouseLeave={e=>e.currentTarget.style.background="none"}>
+                            📍 {s}
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                : <div style={{fontSize:12,color:C.sub,marginTop:3}}>📍 {user.city}</div>
+              }
               <div style={{display:"flex",gap:6,marginTop:7,flexWrap:"wrap"}}>
                 <Badge label={user.level} color={C.accent}/>
                 {user.sports?.map(sid=>{const s=SPORTS.find(x=>x.id===sid);return s?<Badge key={sid} label={`${s.emoji} ${s.label}`} color={s.color}/>:null;})}
@@ -5923,7 +5967,7 @@ export default function App() {
   const doUpdate = u => {
     setUser(u);
     const dbU = DB.find(x=>x.id===u.id);
-    if (dbU) { dbU.nameColor=u.nameColor; if(u.xp!==undefined) dbU.xp=u.xp; }
+    if (dbU) { dbU.nameColor=u.nameColor; if(u.xp!==undefined) dbU.xp=u.xp; if(u.city!==undefined) dbU.city=u.city; }
     const token = localStorage.getItem('rvf_token');
     if (!token) return; // local mock mode — no persistence needed
     fetch(`${API}/api/auth/profile`, {
