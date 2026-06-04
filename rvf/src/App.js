@@ -4025,6 +4025,7 @@ function FriendChallengeModal({ user, friend, terrains, onClose }) {
 function SocialView({ user, terrains, onGoToMessages }) {
   const {t} = useTranslation();
   useStore(FRIENDS);
+  useStore(PROFILES_STORE);
   const [tab,setTab]             = useState("friends");
   const [query,setQuery]         = useState("");
   const [cityFilter,setCityFilter] = useState(null);
