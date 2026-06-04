@@ -537,7 +537,8 @@ function createStore(init = {}) {
 }
 
 // ─── XP STORE ─────────────────────────────────────────────────────────────────
-const XP_STORE = createStore({});
+const XP_STORE       = createStore({});
+const PROFILES_STORE = createStore({});
 const addXP = (userId, amount) => {
   const u = DB.find(x=>x.id===userId);
   if (!u) return;
@@ -961,6 +962,7 @@ function ColoredName({ name, nameColor, style={} }) {
 
 // Reusable badge: colored name + level chip + top earned badges
 function UserBadge({ name, user: userProp, size="md", showLevel=true, showInsignes=true, style={} }) {
+  useStore(PROFILES_STORE);
   const u = userProp || DB.find(x=>x.name===name) || { name:name||"?", xp:0, nameColor:null, referralCount:0, matchs:0, terrains:0, citiesVisited:0 };
   const lvl   = getXpLevel(u.xp||0).level;
   const lvCol = lvl>=21?"#FFD700":lvl>=11?"#CC5DE8":lvl>=6?"#4DABF7":"#888";
@@ -5889,6 +5891,36 @@ export default function App() {
     });
   },[]);
 
+  // Preload all Supabase profiles into DB so UserBadge can resolve nameColor for any user
+  useEffect(()=>{
+    supabase.from('profiles')
+      .select('id,username,name,name_color,xp,referral_count,terrains,matchs')
+      .then(({ data }) => {
+        if (!data?.length) return;
+        data.forEach(p => {
+          const uname = p.name || p.username;
+          if (!uname) return;
+          const existing = DB.find(u => u.id === p.id);
+          if (existing) {
+            if (p.name_color  !== undefined) existing.nameColor     = p.name_color;
+            if (p.xp          !== undefined) existing.xp            = p.xp;
+            if (p.referral_count !== undefined) existing.referralCount = p.referral_count;
+          } else if (!DB.find(u => u.name === uname)) {
+            DB.push({
+              id: p.id, name: uname,
+              nameColor:     p.name_color     || null,
+              xp:            p.xp             || 0,
+              referralCount: p.referral_count || 0,
+              terrains:      p.terrains       || 0,
+              matchs:        p.matchs         || 0,
+              citiesVisited: 0,
+            });
+          }
+        });
+        PROFILES_STORE.notify();
+      });
+  },[]);
+
   // Load terrains from Supabase; keep TERRAINS constant as fallback
   useEffect(()=>{
     supabase.from('terrains').select('*').then(({ data, error }) => {
@@ -5968,6 +6000,7 @@ export default function App() {
     setUser(u);
     const dbU = DB.find(x=>x.id===u.id);
     if (dbU) { dbU.nameColor=u.nameColor; if(u.xp!==undefined) dbU.xp=u.xp; if(u.city!==undefined) dbU.city=u.city; }
+    PROFILES_STORE.notify();
     const token = localStorage.getItem('rvf_token');
     if (!token) return; // local mock mode — no persistence needed
     fetch(`${API}/api/auth/profile`, {
