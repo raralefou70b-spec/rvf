@@ -1888,10 +1888,12 @@ function MapView({ onSelect, terrains, user, onAddTerrain, userPos, gpsError, gp
     return d<1 ? Math.round(d*1000)+"m" : d.toFixed(0)+"km";
   };
 
-  const handleAdd = t => {
-    onAddTerrain(t);
-    setToast(t.name);
-    setTimeout(()=>setToast(null), 3000);
+  const handleAdd = async t => {
+    const result = await onAddTerrain(t);
+    setToast(result === 'offline'
+      ? `⚠️ "${t.name}" visible maintenant (non sauvegardé)`
+      : t.name);
+    setTimeout(()=>setToast(null), 4000);
   };
 
   const handleMapClick = useCallback(pos => {
@@ -6168,7 +6170,6 @@ export default function App() {
 
   const addTerrain = async t => {
     if (user?.id) addXP(user.id, XP_REWARDS.terrain);
-    // Never send a locally-generated numeric id — let Supabase auto-generate a UUID
     const row = {
       name:     t.name,
       sport:    t.sport,
@@ -6187,24 +6188,34 @@ export default function App() {
       added_by: t.addedBy || user?.name || null,
       photos:   t.photos || [],
     };
-    const { data: inserted, error } = await supabase.from('terrains').insert(row).select().single();
-    if (!error && inserted) {
+    // Path 1 — Supabase JS client (works when user has a Supabase auth session)
+    const { data: inserted, error: sbError } = await supabase.from('terrains').insert(row).select().single();
+    if (!sbError && inserted) {
       setTerrains(p => [...p, { ...inserted, addedBy: inserted.added_by }]);
-      return;
+      return 'supabase';
     }
-    console.error('[RVF] Supabase terrain insert error:', error?.message || error);
-    // Fallback: Express backend
+    console.warn('[RVF] Supabase insert:', sbError?.code, sbError?.message);
+
+    // Path 2 — Express backend (works when user has rvf_token OR backend accepts optionalAuth)
     try {
       const res = await fetch(`${API}/api/terrains`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', ...authHeader() },
-        body: JSON.stringify(t),
+        body: JSON.stringify({ ...t, addedBy: t.addedBy || user?.name }),
       });
-      const data = await res.json();
-      if (data.terrain) { setTerrains(p => [...p, data.terrain]); return; }
-    } catch {}
-    // Offline fallback — visible this session only
+      if (res.ok) {
+        const d = await res.json();
+        if (d.terrain) { setTerrains(p => [...p, d.terrain]); return 'express'; }
+      }
+      const errBody = await res.json().catch(() => ({}));
+      console.warn('[RVF] Express insert:', res.status, errBody?.error);
+    } catch (e) {
+      console.warn('[RVF] Express insert network error:', e.message);
+    }
+
+    // Path 3 — offline only (lost on refresh, user sees a toast warning)
     setTerrains(p => [...p, t]);
+    return 'offline';
   };
 
   const deleteTerrain = async id => {
