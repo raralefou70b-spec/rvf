@@ -31,7 +31,7 @@ function rowToTerrain(r) {
 router.get('/', optionalAuth, async (req, res) => {
   try {
     const { rows } = await pool.query(
-      'SELECT * FROM terrains ORDER BY is_seeded DESC, created_at ASC'
+      'SELECT * FROM terrains ORDER BY created_at ASC'
     );
     res.json({ terrains: rows.map(rowToTerrain) });
   } catch (err) {

@@ -1,35 +1,41 @@
 const { Pool } = require('pg');
 
+// Supabase pooler requires SSL regardless of NODE_ENV
+const needsSsl = (process.env.DATABASE_URL || '').includes('supabase.com');
+
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
-  ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false,
+  ssl: needsSsl ? { rejectUnauthorized: false } : false,
 });
 
 async function init() {
   const client = await pool.connect();
   try {
+    // Each block is wrapped so a schema mismatch on Supabase doesn't crash startup
     await client.query(`
       CREATE TABLE IF NOT EXISTS users (
-        id          SERIAL PRIMARY KEY,
-        name        VARCHAR(100) NOT NULL,
-        email       VARCHAR(255) UNIQUE NOT NULL,
+        id            SERIAL PRIMARY KEY,
+        name          VARCHAR(100) NOT NULL,
+        email         VARCHAR(255) UNIQUE NOT NULL,
         password_hash VARCHAR(255) NOT NULL,
-        city        VARCHAR(100) DEFAULT '',
-        bio         TEXT DEFAULT '',
-        avatar      VARCHAR(20) DEFAULT NULL,
-        phone       VARCHAR(30) DEFAULT '',
-        sport       VARCHAR(50) DEFAULT '',
-        level       VARCHAR(50) DEFAULT 'Amateur',
-        wins        INTEGER DEFAULT 0,
-        draws       INTEGER DEFAULT 0,
-        losses      INTEGER DEFAULT 0,
+        city          VARCHAR(100) DEFAULT '',
+        bio           TEXT DEFAULT '',
+        avatar        VARCHAR(20) DEFAULT NULL,
+        phone         VARCHAR(30) DEFAULT '',
+        sport         VARCHAR(50) DEFAULT '',
+        level         VARCHAR(50) DEFAULT 'Amateur',
+        wins          INTEGER DEFAULT 0,
+        draws         INTEGER DEFAULT 0,
+        losses        INTEGER DEFAULT 0,
         terrains_count INTEGER DEFAULT 0,
         matchs_count   INTEGER DEFAULT 0,
         teams_count    INTEGER DEFAULT 0,
-        verified    BOOLEAN DEFAULT false,
-        created_at  TIMESTAMPTZ DEFAULT NOW()
-      );
+        verified      BOOLEAN DEFAULT false,
+        created_at    TIMESTAMPTZ DEFAULT NOW()
+      )
+    `).catch(e => console.warn('[DB] users table:', e.message));
 
+    await client.query(`
       CREATE TABLE IF NOT EXISTS terrains (
         id          VARCHAR(50) PRIMARY KEY,
         name        VARCHAR(200) NOT NULL,
@@ -50,16 +56,17 @@ async function init() {
         added_by_user_id INTEGER REFERENCES users(id) ON DELETE SET NULL,
         is_seeded   BOOLEAN DEFAULT false,
         created_at  TIMESTAMPTZ DEFAULT NOW()
-      );
-    `);
+      )
+    `).catch(e => console.warn('[DB] terrains table:', e.message));
 
-    // Idempotent migrations for new columns
     await client.query(`
       DO $$ BEGIN
-        BEGIN ALTER TABLE users ADD COLUMN role    VARCHAR(20)  DEFAULT 'user';  EXCEPTION WHEN duplicate_column THEN NULL; END;
-        BEGIN ALTER TABLE users ADD COLUMN blocked BOOLEAN      DEFAULT false;   EXCEPTION WHEN duplicate_column THEN NULL; END;
-      END $$;
+        BEGIN ALTER TABLE users ADD COLUMN role    VARCHAR(20) DEFAULT 'user';  EXCEPTION WHEN duplicate_column THEN NULL; END;
+        BEGIN ALTER TABLE users ADD COLUMN blocked BOOLEAN     DEFAULT false;   EXCEPTION WHEN duplicate_column THEN NULL; END;
+      END $$
+    `).catch(e => console.warn('[DB] migrations:', e.message));
 
+    await client.query(`
       CREATE TABLE IF NOT EXISTS reports (
         id          SERIAL PRIMARY KEY,
         user_id     INTEGER REFERENCES users(id) ON DELETE SET NULL,
@@ -68,21 +75,30 @@ async function init() {
         description TEXT NOT NULL,
         status      VARCHAR(20) DEFAULT 'new',
         created_at  TIMESTAMPTZ DEFAULT NOW()
-      );
+      )
+    `).catch(e => console.warn('[DB] reports table:', e.message));
 
+    await client.query(`
       CREATE TABLE IF NOT EXISTS maintenance (
         id      INTEGER PRIMARY KEY DEFAULT 1,
         active  BOOLEAN DEFAULT false,
         message TEXT    DEFAULT ''
-      );
+      )
+    `).catch(e => console.warn('[DB] maintenance table:', e.message));
 
-      INSERT INTO maintenance (id, active, message) VALUES (1, false, '') ON CONFLICT (id) DO NOTHING;
-    `);
+    await client.query(
+      `INSERT INTO maintenance (id, active, message) VALUES (1, false, '') ON CONFLICT (id) DO NOTHING`
+    ).catch(() => {});
 
-    const { rows } = await client.query('SELECT COUNT(*) FROM terrains WHERE is_seeded = true');
-    if (parseInt(rows[0].count) === 0) {
-      console.log('Seeding terrains...');
-      await seedTerrains(client);
+    // is_seeded column may not exist when terrains table was created via Supabase SQL
+    try {
+      const { rows } = await client.query('SELECT COUNT(*) FROM terrains WHERE is_seeded = true');
+      if (parseInt(rows[0].count) === 0) {
+        console.log('[DB] Seeding terrains...');
+        await seedTerrains(client);
+      }
+    } catch {
+      console.log('[DB] Terrain seed skipped (is_seeded column not present — OK for Supabase schema)');
     }
   } finally {
     client.release();
