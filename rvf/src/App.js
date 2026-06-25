@@ -6,6 +6,8 @@ import "react-phone-number-input/style.css";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 import { supabase } from "./supabaseClient";
+import { Capacitor } from "@capacitor/core";
+import { Geolocation } from "@capacitor/geolocation";
 
 // Backend API base URL — set VITE_API_URL in .env for production
 const API = import.meta.env.VITE_API_URL || 'http://localhost:3001';
@@ -15,8 +17,9 @@ function authHeader() {
   return t ? { Authorization: `Bearer ${t}` } : {};
 }
 
-// GPS works on HTTPS and on localhost (dev); all other HTTP origins block it on mobile
+// GPS works on HTTPS and on localhost (dev); on native platform it's always available
 const GPS_NEEDS_HTTPS =
+  !Capacitor.isNativePlatform() &&
   window.location.protocol !== 'https:' &&
   window.location.hostname !== 'localhost' &&
   window.location.hostname !== '127.0.0.1';
@@ -2125,8 +2128,18 @@ function ItineraryTab({ terrain, sp }) {
     setResult({ dur:h>0?`${h}h${min>0?min+"min":""}`:mins+" min", dist:km, steps, mins });
   };
 
-  const locate = () => {
+  const locate = async () => {
     setStatus("locating"); setShowManual(false);
+    if (Capacitor.isNativePlatform()) {
+      try {
+        const perm = await Geolocation.requestPermissions();
+        if (perm.location === "denied") { setStatus("error"); return; }
+        const p = await Geolocation.getCurrentPosition({ timeout: 6000 });
+        const pos = { lat: p.coords.latitude, lng: p.coords.longitude };
+        setPos(pos); setStatus("ready"); calcRoute(pos, mode);
+      } catch { setStatus("error"); }
+      return;
+    }
     if (!navigator.geolocation) { setStatus("error"); return; }
     navigator.geolocation.getCurrentPosition(
       p => { const pos={lat:p.coords.latitude,lng:p.coords.longitude}; setPos(pos); setStatus("ready"); calcRoute(pos,mode); },
@@ -6099,11 +6112,35 @@ export default function App() {
       .catch(() => {});
   },[]);
 
-  const requestGps = useCallback((highAccuracy=true) => {
+  const requestGps = useCallback(async (highAccuracy=true) => {
     if (GPS_NEEDS_HTTPS) { setGpsError(4); return; }
-    if (!navigator.geolocation) { setGpsError(2); return; }
     setGpsError(null);
     setGpsLoading(true);
+
+    if (Capacitor.isNativePlatform()) {
+      try {
+        const perm = await Geolocation.requestPermissions();
+        if (perm.location === "denied") { setGpsLoading(false); setGpsError(1); return; }
+        const p = await Geolocation.getCurrentPosition({
+          enableHighAccuracy: highAccuracy,
+          timeout: highAccuracy ? 20000 : 10000,
+        });
+        const pos = { lat: p.coords.latitude, lng: p.coords.longitude };
+        setUserPos(pos);
+        setGpsError(null);
+        setGpsLoading(false);
+        setTerrains(prev=>[...prev].sort((a,b)=>
+          haversine(pos.lat,pos.lng,a.lat,a.lng)-haversine(pos.lat,pos.lng,b.lat,b.lng)
+        ));
+      } catch(e) {
+        setGpsLoading(false);
+        if (e.code===3 && highAccuracy) requestGps(false);
+        else setGpsError(e.code ?? 3);
+      }
+      return;
+    }
+
+    if (!navigator.geolocation) { setGpsLoading(false); setGpsError(2); return; }
     navigator.geolocation.getCurrentPosition(
       p=>{
         const pos={lat:p.coords.latitude,lng:p.coords.longitude};
@@ -6117,19 +6154,17 @@ export default function App() {
       e=>{
         setGpsLoading(false);
         // On timeout, retry with low accuracy (faster fix)
-        if (e.code===3 && highAccuracy) {
-          requestGps(false);
-        } else {
-          setGpsError(e.code);
-        }
+        if (e.code===3 && highAccuracy) requestGps(false);
+        else setGpsError(e.code);
       },
       {timeout: highAccuracy ? 20000 : 10000, enableHighAccuracy: highAccuracy, maximumAge:60000}
     );
   },[]);// eslint-disable-line react-hooks/exhaustive-deps
 
-  // Géolocalisation → tri par proximité (vérif permission avant demande)
+  // Géolocalisation → tri par proximité
   useEffect(()=>{
     if (GPS_NEEDS_HTTPS) { setGpsError(4); return; }
+    if (Capacitor.isNativePlatform()) { requestGps(); return; }
     if (!navigator.geolocation) { setGpsError(2); return; }
     if (navigator.permissions) {
       navigator.permissions.query({name:"geolocation"}).then(result=>{
