@@ -3120,8 +3120,8 @@ function ChallengeModal({ user, myTeams, targetTeam, terrains, onClose }) {
               <div style={{flex:1,textAlign:"center"}}>
                 {mode==="solo" ? (
                   <>
-                    <div style={{width:36,height:36,borderRadius:"50%",background:`${C.orange}25`,border:`2px solid ${C.orange}55`,display:"flex",alignItems:"center",justifyContent:"center",margin:"0 auto 4px",fontSize:16,fontWeight:700,color:C.orange}}>{user.name[0]}</div>
-                    <div style={{fontSize:11,fontWeight:700,color:C.text}}>{user.name}</div>
+                    <div style={{width:36,height:36,borderRadius:"50%",background:`${C.orange}25`,border:`2px solid ${C.orange}55`,display:"flex",alignItems:"center",justifyContent:"center",margin:"0 auto 4px",fontSize:16,fontWeight:700,color:C.orange}}>{(user.name || user.username || '?')[0]}</div>
+                    <div style={{fontSize:11,fontWeight:700,color:C.text}}>{user.name || user.username || '?'}</div>
                     <div style={{fontSize:10,color:C.orange,marginTop:1}}>{t('common.solo')}</div>
                   </>
                 ) : (
@@ -4242,6 +4242,7 @@ function MessagingView({ user, openWith }) {
   useEffect(()=>{
     if (!selTeam) return;
     let cancelled = false;
+        console.log('[team_chat] selTeam =', selTeam, typeof selTeam);
 
     // 1. Charger tout l'historique de l'équipe
     supabase.from('team_messages').select('*').eq('team_id',selTeam).order('created_at',{ascending:true})
