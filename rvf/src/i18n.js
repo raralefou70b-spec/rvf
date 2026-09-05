@@ -504,6 +504,17 @@ const resources = {
       hack_btn:"Signaler l'activité",
       no_reports:"Aucun signalement.",
     },
+    badges: {
+      builder:"Bâtisseur", builder_desc:"Créer des terrains",
+      explorer:"Explorateur", explorer_desc:"Visiter plusieurs villes",
+      competitor:"Compétiteur", competitor_desc:"Jouer des matchs",
+      recruiter:"Recruteur", recruiter_desc:"Parrainer des amis",
+      bronze:"Bronze", silver:"Argent", gold:"Or",
+    },
+    colors: {
+      default:"Défaut", silver:"Argent", blue:"Bleu", green:"Vert",
+      purple:"Violet", orange:"Orange", pink:"Rose", gold:"Or ✨", rainbow:"Arc-en-ciel",
+    },
   }},
 
   en: { translation: {
@@ -1000,6 +1011,17 @@ const resources = {
       hack_btn:"Report activity",
       no_reports:"No reports.",
     },
+    badges: {
+      builder:"Builder", builder_desc:"Create fields",
+      explorer:"Explorer", explorer_desc:"Visit several cities",
+      competitor:"Competitor", competitor_desc:"Play matches",
+      recruiter:"Recruiter", recruiter_desc:"Refer friends",
+      bronze:"Bronze", silver:"Silver", gold:"Gold",
+    },
+    colors: {
+      default:"Default", silver:"Silver", blue:"Blue", green:"Green",
+      purple:"Purple", orange:"Orange", pink:"Pink", gold:"Gold ✨", rainbow:"Rainbow",
+    },
   }},
 
   es: { translation: {
@@ -1464,6 +1486,17 @@ const resources = {
       hack_btn:"Reportar actividad",
       no_reports:"Sin denuncias.",
     },
+    badges: {
+      builder:"Constructor", builder_desc:"Crear campos",
+      explorer:"Explorador", explorer_desc:"Visitar varias ciudades",
+      competitor:"Competidor", competitor_desc:"Jugar partidos",
+      recruiter:"Reclutador", recruiter_desc:"Recomendar amigos",
+      bronze:"Bronce", silver:"Plata", gold:"Oro",
+    },
+    colors: {
+      default:"Predeterminado", silver:"Plata", blue:"Azul", green:"Verde",
+      purple:"Violeta", orange:"Naranja", pink:"Rosa", gold:"Oro ✨", rainbow:"Arcoíris",
+    },
   }},
 
   pt: { translation: {
@@ -1809,6 +1842,17 @@ const resources = {
       bug_btn:"Enviar relatório",
       hack_btn:"Reportar atividade",
       no_reports:"Nenhuma denúncia.",
+    },
+    badges: {
+      builder:"Construtor", builder_desc:"Criar campos",
+      explorer:"Explorador", explorer_desc:"Visitar várias cidades",
+      competitor:"Competidor", competitor_desc:"Jogar partidas",
+      recruiter:"Recrutador", recruiter_desc:"Indicar amigos",
+      bronze:"Bronze", silver:"Prata", gold:"Ouro",
+    },
+    colors: {
+      default:"Padrão", silver:"Prata", blue:"Azul", green:"Verde",
+      purple:"Roxo", orange:"Laranja", pink:"Rosa", gold:"Ouro ✨", rainbow:"Arco-íris",
     },
   }},
 
@@ -2157,6 +2201,17 @@ const resources = {
       hack_btn:"الإبلاغ عن النشاط",
       no_reports:"لا توجد بلاغات.",
     },
+    badges: {
+      builder:"البنّاء", builder_desc:"إنشاء ملاعب",
+      explorer:"المستكشف", explorer_desc:"زيارة مدن متعددة",
+      competitor:"المنافس", competitor_desc:"لعب مباريات",
+      recruiter:"المجنِّد", recruiter_desc:"إحالة الأصدقاء",
+      bronze:"برونزي", silver:"فضي", gold:"ذهبي",
+    },
+    colors: {
+      default:"افتراضي", silver:"فضي", blue:"أزرق", green:"أخضر",
+      purple:"بنفسجي", orange:"برتقالي", pink:"وردي", gold:"ذهبي ✨", rainbow:"قوس قزح",
+    },
   }},
 
   zh: { translation: {
@@ -2503,6 +2558,17 @@ const resources = {
       bug_btn:"发送报告",
       hack_btn:"举报活动",
       no_reports:"暂无举报。",
+    },
+    badges: {
+      builder:"建造者", builder_desc:"创建球场",
+      explorer:"探索者", explorer_desc:"探访多个城市",
+      competitor:"竞技者", competitor_desc:"参加比赛",
+      recruiter:"招募者", recruiter_desc:"推荐朋友",
+      bronze:"铜", silver:"银", gold:"金",
+    },
+    colors: {
+      default:"默认", silver:"银色", blue:"蓝色", green:"绿色",
+      purple:"紫色", orange:"橙色", pink:"粉色", gold:"金色 ✨", rainbow:"彩虹",
     },
   }},
 
@@ -2851,6 +2917,17 @@ const resources = {
       hack_btn:"गतिविधि रिपोर्ट करें",
       no_reports:"कोई रिपोर्ट नहीं।",
     },
+    badges: {
+      builder:"निर्माता", builder_desc:"मैदान बनाएं",
+      explorer:"अन्वेषक", explorer_desc:"कई शहरों का दौरा करें",
+      competitor:"प्रतियोगी", competitor_desc:"मैच खेलें",
+      recruiter:"भर्तीकर्ता", recruiter_desc:"दोस्तों को रेफर करें",
+      bronze:"कांस्य", silver:"रजत", gold:"स्वर्ण",
+    },
+    colors: {
+      default:"डिफ़ॉल्ट", silver:"रजत", blue:"नीला", green:"हरा",
+      purple:"बैंगनी", orange:"नारंगी", pink:"गुलाबी", gold:"सोना ✨", rainbow:"इंद्रधनुष",
+    },
   }},
 
   de: { translation: {
@@ -3197,6 +3274,17 @@ const resources = {
       bug_btn:"Bericht senden",
       hack_btn:"Aktivität melden",
       no_reports:"Keine Meldungen.",
+    },
+    badges: {
+      builder:"Erbauer", builder_desc:"Felder erstellen",
+      explorer:"Entdecker", explorer_desc:"Mehrere Städte besuchen",
+      competitor:"Wettkämpfer", competitor_desc:"Spiele spielen",
+      recruiter:"Werber", recruiter_desc:"Freunde werben",
+      bronze:"Bronze", silver:"Silber", gold:"Gold",
+    },
+    colors: {
+      default:"Standard", silver:"Silber", blue:"Blau", green:"Grün",
+      purple:"Lila", orange:"Orange", pink:"Rosa", gold:"Gold ✨", rainbow:"Regenbogen",
     },
   }},
 
@@ -3545,6 +3633,17 @@ const resources = {
       hack_btn:"Segnala attività",
       no_reports:"Nessuna segnalazione.",
     },
+    badges: {
+      builder:"Costruttore", builder_desc:"Creare campi",
+      explorer:"Esploratore", explorer_desc:"Visitare più città",
+      competitor:"Competitore", competitor_desc:"Giocare partite",
+      recruiter:"Reclutatore", recruiter_desc:"Referire amici",
+      bronze:"Bronzo", silver:"Argento", gold:"Oro",
+    },
+    colors: {
+      default:"Predefinito", silver:"Argento", blue:"Blu", green:"Verde",
+      purple:"Viola", orange:"Arancione", pink:"Rosa", gold:"Oro ✨", rainbow:"Arcobaleno",
+    },
   }},
 
   ru: { translation: {
@@ -3891,6 +3990,17 @@ const resources = {
       bug_btn:"Отправить отчёт",
       hack_btn:"Сообщить об активности",
       no_reports:"Нет жалоб.",
+    },
+    badges: {
+      builder:"Строитель", builder_desc:"Создавать поля",
+      explorer:"Исследователь", explorer_desc:"Посещать разные города",
+      competitor:"Конкурент", competitor_desc:"Играть матчи",
+      recruiter:"Рекрутёр", recruiter_desc:"Приглашать друзей",
+      bronze:"Бронза", silver:"Серебро", gold:"Золото",
+    },
+    colors: {
+      default:"По умолчанию", silver:"Серебро", blue:"Синий", green:"Зелёный",
+      purple:"Фиолетовый", orange:"Оранжевый", pink:"Розовый", gold:"Золотой ✨", rainbow:"Радуга",
     },
   }},
 
@@ -4239,6 +4349,17 @@ const resources = {
       hack_btn:"活動を報告",
       no_reports:"報告はありません。",
     },
+    badges: {
+      builder:"建設者", builder_desc:"フィールドを作る",
+      explorer:"探検家", explorer_desc:"複数の都市を訪問",
+      competitor:"競技者", competitor_desc:"試合をする",
+      recruiter:"リクルーター", recruiter_desc:"友達を紹介する",
+      bronze:"ブロンズ", silver:"シルバー", gold:"ゴールド",
+    },
+    colors: {
+      default:"デフォルト", silver:"シルバー", blue:"青", green:"緑",
+      purple:"紫", orange:"オレンジ", pink:"ピンク", gold:"ゴールド ✨", rainbow:"虹",
+    },
   }},
 
   ko: { translation: {
@@ -4585,6 +4706,17 @@ const resources = {
       bug_btn:"보고서 보내기",
       hack_btn:"활동 신고",
       no_reports:"신고가 없습니다.",
+    },
+    badges: {
+      builder:"건설자", builder_desc:"필드 만들기",
+      explorer:"탐험가", explorer_desc:"여러 도시 방문",
+      competitor:"경쟁자", competitor_desc:"경기 하기",
+      recruiter:"리크루터", recruiter_desc:"친구 추천",
+      bronze:"브론즈", silver:"실버", gold:"골드",
+    },
+    colors: {
+      default:"기본", silver:"실버", blue:"파란색", green:"초록색",
+      purple:"보라색", orange:"주황색", pink:"분홍색", gold:"골드 ✨", rainbow:"무지개",
     },
   }},
 };

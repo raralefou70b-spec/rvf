@@ -30,7 +30,7 @@ app.use('/api/auth',    require('./routes/auth'));
 app.use('/api/terrains',require('./routes/terrains'));
 app.use('/api/reports', require('./routes/reports'));
 app.use('/api/admin',   require('./routes/admin'));
-
+app.use('/api/teams',   require('./routes/teams'));
 // Public maintenance status (no auth required)
 app.get('/api/maintenance', async (_, res) => {
   try {

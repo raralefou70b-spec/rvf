@@ -395,10 +395,10 @@ const XP_REWARDS = { terrain:50, visit:20, match:30, referral:100 };
 
 // ── SPECIALIZED BADGES ────────────────────────────────────────────────────────
 const BADGE_DEFS = [
-  { id:"builder",    emoji:"🏗️", name:"Bâtisseur",  desc:"Créer des terrains",     tiers:[{min:5,medal:"🥉",label:"Bronze"},{min:15,medal:"🥈",label:"Argent"},{min:30,medal:"🥇",label:"Or"}],    stat:u=>u.terrains||0 },
-  { id:"explorer",   emoji:"🌍", name:"Explorateur", desc:"Visiter plusieurs villes", tiers:[{min:5,medal:"🥉",label:"Bronze"},{min:15,medal:"🥈",label:"Argent"},{min:30,medal:"🥇",label:"Or"}],    stat:u=>u.citiesVisited||0 },
-  { id:"competitor", emoji:"⚽", name:"Compétiteur", desc:"Jouer des matchs",         tiers:[{min:10,medal:"🥉",label:"Bronze"},{min:30,medal:"🥈",label:"Argent"},{min:75,medal:"🥇",label:"Or"}],   stat:u=>u.matchs||0 },
-  { id:"recruiter",  emoji:"🤝", name:"Recruteur",   desc:"Parrainer des amis",       tiers:[{min:3,medal:"🥉",label:"Bronze"},{min:10,medal:"🥈",label:"Argent"},{min:25,medal:"🥇",label:"Or"}],    stat:u=>u.referralCount||0 },
+  { id:"builder",    emoji:"🏗️", nameKey:"badges.builder",    descKey:"badges.builder_desc",    tiers:[{min:5,medal:"🥉",labelKey:"badges.bronze"},{min:15,medal:"🥈",labelKey:"badges.silver"},{min:30,medal:"🥇",labelKey:"badges.gold"}],    stat:u=>u.terrains||0 },
+  { id:"explorer",   emoji:"🌍", nameKey:"badges.explorer",   descKey:"badges.explorer_desc",   tiers:[{min:5,medal:"🥉",labelKey:"badges.bronze"},{min:15,medal:"🥈",labelKey:"badges.silver"},{min:30,medal:"🥇",labelKey:"badges.gold"}],    stat:u=>u.citiesVisited||0 },
+  { id:"competitor", emoji:"⚽", nameKey:"badges.competitor", descKey:"badges.competitor_desc", tiers:[{min:10,medal:"🥉",labelKey:"badges.bronze"},{min:30,medal:"🥈",labelKey:"badges.silver"},{min:75,medal:"🥇",labelKey:"badges.gold"}],   stat:u=>u.matchs||0 },
+  { id:"recruiter",  emoji:"🤝", nameKey:"badges.recruiter",  descKey:"badges.recruiter_desc",  tiers:[{min:3,medal:"🥉",labelKey:"badges.bronze"},{min:10,medal:"🥈",labelKey:"badges.silver"},{min:25,medal:"🥇",labelKey:"badges.gold"}],    stat:u=>u.referralCount||0 },
 ];
 const getBadgeTier   = (def,u) => { let t=null; for(const x of def.tiers){if(def.stat(u)>=x.min)t=x;} return t; };
 const getUserBadges  = u => BADGE_DEFS.map(d=>({def:d,tier:getBadgeTier(d,u)}));
@@ -454,12 +454,6 @@ async function backendOnline() {
 }
 
 async function login(email, pwd) {
-  // Try Supabase auth first
-  const { data, error } = await supabase.auth.signInWithPassword({ email, password: pwd });
-  if (!error && data.user) {
-    const { data: profile } = await supabase.from('profiles').select('*').eq('id', data.user.id).single();
-    return profile || { id: data.user.id, email, name: data.user.user_metadata?.name || email, terrains: 0, matchs: 0, teams: 0, avatar: null };
-  }
   // Fallback: Express backend
   if (await backendOnline()) {
     const res = await fetch(`${API}/api/auth/login`, {
@@ -496,19 +490,6 @@ async function register(form) {
       if (rp) await supabase.from('profiles').update({ referral_count:(rp.referral_count||0)+1 }).eq('id',rp.id);
     }
   };
-
-  // Try Supabase auth first
-  const { data, error } = await supabase.auth.signUp({
-    email: form.email,
-    password: form.password,
-    options: { data: { name: form.name } },
-  });
-  if (!error && data.user) {
-    const profile = { id: data.user.id, name: form.name, city: form.city, sports: form.sports, level: form.level, phone: form.phone, email: form.email, verified: false, role: 'user', terrains: 0, matchs: 0, teams: 0, avatar: null, referral_code: referralCode, referral_count: 0, referred_by: refCode||null };
-    await supabase.from('profiles').upsert(profile);
-    await creditReferrer(data.user.id);
-    return profile;
-  }
   // Fallback: Express backend
   if (await backendOnline()) {
     const res = await fetch(`${API}/api/auth/register`, {
@@ -980,8 +961,8 @@ function UserBadge({ name, user: userProp, size="md", showLevel=true, showInsign
     <span style={{display:"inline-flex",alignItems:"center",gap:4,...style}}>
       <ColoredName name={name} nameColor={u.nameColor||null} style={{fontWeight:700,fontSize:fs}}/>
       {showLevel && <span style={{fontSize:fs-3,fontWeight:700,color:lvCol,background:`${lvCol}18`,border:`1px solid ${lvCol}33`,borderRadius:4,padding:"0 4px",whiteSpace:"nowrap"}}>{i18n.t('common.niv')}{lvl}</span>}
-      {showInsignes && top && <span title={`${top.def.name} ${top.tier.label}`} style={{fontSize:fs-1}}>{top.tier.medal}</span>}
-      {showInsignes && refBadge && <span title={getReferralLevel(u.referralCount||0).name} style={{fontSize:fs-1}}>{refBadge}</span>}
+      {showInsignes && top && <span title={`${i18n.t(top.def.nameKey)} ${i18n.t(top.tier.labelKey)}`} style={{fontSize:fs-1}}>{top.tier.medal}</span>}
+      {showInsignes && refBadge && <span title={i18n.t('profile.ref_level_'+getReferralLevel(u.referralCount||0).level)} style={{fontSize:fs-1}}>{refBadge}</span>}
     </span>
   );
 }
@@ -1116,40 +1097,12 @@ function RegisterScreen({ onSuccess, goBack }) {
     if (!f.phone)          e.phone=t('auth.phone_required');
     setErr(e);
     if (Object.keys(e).length) return;
-    setSending(true);
-    await pause(1000);
-    const code = String(Math.floor(100000+Math.random()*900000));
-    setSentCode(code);
-    setStep(3);
-    setSending(false);
-    startTimer();
-    console.log("🔐 Code RVF:", code);
+       setLoading(true);
+    try {
+      onSuccess(await register({ name:f.name,email:f.email,password:f.pwd,city:f.city,level:f.level,sports:f.sports,phone:f.phone,bio:"",verified:true }));
+    } catch(m) { setApiErr(m?.message||m); }
+    finally { setLoading(false); }
   };
-
-  const verify = async () => {
-    if (inputCode.trim()===sentCode) { // eslint-disable-line
-      setVerified(true);
-      await pause(500);
-      setLoading(true);
-      try {
-        onSuccess(await register({ name:f.name,email:f.email,password:f.pwd,city:f.city,level:f.level,sports:f.sports,phone:f.phone,bio:"",verified:true }));
-      } catch(m) { setApiErr(m?.message||m); }
-      finally { setLoading(false); }
-    } else {
-      setCodeErr(t('auth.code_error'));
-    }
-  };
-
-  const resend = async () => {
-    if (timer>0) return;
-    setSending(true);
-    await pause(800);
-    const code = String(Math.floor(100000+Math.random()*900000));
-    setSentCode(code); setInputCode(""); setCodeErr("");
-    setSending(false); startTimer();
-    console.log("🔐 Nouveau code:", code);
-  };
-
   return (
     <div style={{flex:1,display:"flex",alignItems:"center",justifyContent:"center",padding:24,overflowY:"auto"}}>
       <div style={{maxWidth:460,width:"100%"}}>
@@ -1159,13 +1112,13 @@ function RegisterScreen({ onSuccess, goBack }) {
         <div style={{background:C.card,border:`1px solid ${C.border}`,borderRadius:20,padding:28}}>
           <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:8}}>
             <div style={{fontFamily:C.head,fontWeight:700,fontSize:24,color:C.text}}>
-              {step===1?t('auth.register_step1'):step===2?t('auth.register_step2'):t('auth.register_step3')}
+            {step===1?t('auth.register_step1'):t('auth.register_step2')}
             </div>
-            <span style={{fontSize:11,color:C.sub,fontWeight:600}}>{t('auth.step')} {step}/3</span>
+            <span style={{fontSize:11,color:C.sub,fontWeight:600}}>{t('auth.step')} {step}/2</span>
           </div>
           {/* Progress */}
           <div style={{display:"flex",gap:6,marginBottom:22}}>
-            {[t('auth.step_info'),t('auth.step_profile'),t('auth.step_sms')].map((l,i)=>(
+           {[t('auth.step_info'),t('auth.step_profile')].map((l,i)=>(
               <div key={l} style={{flex:1}}>
                 <div style={{height:3,borderRadius:3,background:i<step?C.accent:C.card2,marginBottom:4,transition:"background .3s"}}/>
                 <div style={{fontSize:9,color:i<step?C.accent:C.sub,fontWeight:700,textAlign:"center"}}>{l}</div>
@@ -1204,33 +1157,7 @@ function RegisterScreen({ onSuccess, goBack }) {
                   {LEVELS.map((l,i)=><Chip key={l} active={f.level===l} onClick={()=>set("level",l)} color={C.purple}>{t('levels.'+LEVEL_KEYS[i])}</Chip>)}
                 </div>
               </div>
-              <Btn onClick={sendSMS} loading={sending} variant="solid">📱 {t('auth.send_code')} →</Btn>
-            </div>
-          )}
-
-          {step===3 && (
-            <div style={{display:"flex",flexDirection:"column",gap:14}}>
-              <div style={{background:"rgba(77,171,247,.1)",border:"1px solid rgba(77,171,247,.3)",borderRadius:12,padding:14,textAlign:"center"}}>
-                <div style={{fontSize:28,marginBottom:4}}>📱</div>
-                <div style={{fontSize:13,fontWeight:700,color:C.blue}}>{t('auth.code_sent_to')} {f.phone}</div>
-                <div style={{fontSize:12,color:C.sub,marginTop:2}}>{t('auth.code_hint')}</div>
-              </div>
-              <input value={inputCode} onChange={e=>{setInputCode(e.target.value.replace(/\D/g,"").slice(0,6));setCodeErr("");}}
-                placeholder="_ _ _ _ _ _" maxLength={6}
-                style={{width:"100%",background:C.card2,border:`1.5px solid ${codeErr?C.red:C.border}`,borderRadius:10,padding:"14px",color:C.text,fontSize:26,outline:"none",fontFamily:C.head,letterSpacing:10,textAlign:"center"}}/>
-              {codeErr && <ErrBox msg={codeErr}/>}
-              {verified && <div style={{background:"rgba(81,207,102,.1)",border:"1px solid rgba(81,207,102,.3)",borderRadius:8,padding:"9px 14px",color:C.green,fontSize:13,fontWeight:700,textAlign:"center"}}>{t('auth.verified_number')}</div>}
-              <ErrBox msg={apiErr}/>
-              <Btn onClick={verify} loading={loading} disabled={inputCode.length<6} variant="solid">✅ {t('auth.verify')}</Btn>
-              <div style={{textAlign:"center",fontSize:12,color:C.sub}}>
-                {timer>0
-                  ? <span>{t('auth.resend_in')} <span style={{color:C.accent,fontWeight:700}}>{timer}s</span></span>
-                  : <button onClick={resend} style={{background:"none",border:"none",color:C.accent,fontSize:12,cursor:"pointer",fontFamily:C.font,fontWeight:600}}>{sending?t('common.loading'):t('auth.resend_code')}</button>
-                }
-              </div>
-              <div style={{background:C.card2,border:`1px solid ${C.border}`,borderRadius:8,padding:"8px 12px",fontSize:11,color:C.sub,textAlign:"center"}}>
-                {t('auth.demo_mode')}
-              </div>
+             <Btn onClick={sendSMS} loading={sending} variant="solid">📱 {t('auth.register_btn')}</Btn>  
             </div>
           )}
         </div>
@@ -1238,7 +1165,6 @@ function RegisterScreen({ onSuccess, goBack }) {
     </div>
   );
 }
-
 function WelcomeScreen({ user, onEnter }) {
   const {t} = useTranslation();
   const [show,setShow] = useState(false);
@@ -1260,7 +1186,6 @@ function WelcomeScreen({ user, onEnter }) {
     </div>
   );
 }
-
 // ─── PHONE FIELD ─────────────────────────────────────────────────────────────
 function PhoneField({ value, onChange, error, hint }) {
   const {t} = useTranslation();
@@ -3837,9 +3762,9 @@ function UserProfileModal({ profile, currentUser, onClose, onGoToMessages }) {
             return (
               <div style={{display:"flex",gap:6,flexWrap:"wrap",marginBottom:14,padding:"8px 10px",background:C.card2,borderRadius:10}}>
                 {earned.map(({def,tier})=>(
-                  <span key={def.id} title={`${def.name} — ${tier.label}`}
+                  <span key={def.id} title={`${t(def.nameKey)} — ${t(tier.labelKey)}`}
                     style={{display:"inline-flex",alignItems:"center",gap:3,fontSize:11,color:C.text,background:C.card,border:`1px solid rgba(255,215,0,.3)`,borderRadius:16,padding:"3px 8px"}}>
-                    {def.emoji} {tier.medal} {def.name}
+                    {def.emoji} {tier.medal} {t(def.nameKey)}
                   </span>
                 ))}
                 {refBadge.badge && (
@@ -4274,6 +4199,7 @@ function MessagingView({ user, openWith }) {
   const [selTeam,setSelTeam]   = useState(null);
   const [teamMsg,setTeamMsg]   = useState("");
   const teamMsgEndRef          = useRef();
+  const teamChannelRef         = useRef(null);
 
   const isMobile = useIsMobile();
 
@@ -4312,25 +4238,51 @@ function MessagingView({ user, openWith }) {
   useEffect(()=>{ teamMsgEndRef.current?.scrollIntoView({behavior:"smooth"}); },[selTeam,teamMsgs.length]);
   useEffect(()=>{ if(selTeam) TEAM_CHAT.markRead(selTeam,user.id); },[selTeam,teamMsgs.length]);
 
-  // Supabase: load + subscribe to team messages
+  // Supabase: charge l'historique + écoute les INSERT via postgres_changes (sans filtre serveur)
   useEffect(()=>{
     if (!selTeam) return;
+    let cancelled = false;
+
+    // 1. Charger tout l'historique de l'équipe
     supabase.from('team_messages').select('*').eq('team_id',selTeam).order('created_at',{ascending:true})
-      .then(({data})=>{
-        if (data?.length) {
-          TEAM_CHAT.byTeam[selTeam] = data.map(m=>({ id:m.id, userId:m.user_id, from:m.user_name, text:m.content, ts:m.created_at }));
-          TEAM_CHAT.notify();
-        }
+      .then(({data, error})=>{
+        if (cancelled) return;
+        if (error) { console.warn('[team_chat] load error:', error.message); return; }
+        const remote = (data||[]).map(m=>({ id:m.id, userId:m.user_id, from:m.user_name, text:m.content, ts:m.created_at }));
+        // Merge : garde les messages locaux (tmp_* + reçus via RT) absents du remote
+        const existing = TEAM_CHAT.byTeam[selTeam] || [];
+        const remoteIds = new Set(remote.map(m=>m.id));
+        const localOnly = existing.filter(m=>!remoteIds.has(m.id));
+        TEAM_CHAT.byTeam[selTeam] = [...remote, ...localOnly].sort((a,b)=>a.ts.localeCompare(b.ts));
+        TEAM_CHAT.notify();
       });
-    const channel = supabase.channel(`team_chat_${selTeam}`)
-      .on('postgres_changes',{ event:'INSERT', schema:'public', table:'team_messages', filter:`team_id=eq.${selTeam}` }, payload=>{
-        const m = payload.new;
-        const nm = { id:m.id, userId:m.user_id, from:m.user_name, text:m.content, ts:m.created_at };
+
+    // 2. Écouter les nouveaux INSERT en temps réel (sans filtre serveur = pas besoin de REPLICA IDENTITY FULL)
+    //    Filtre client-side par team_id
+    const channel = supabase.channel(`team_chat_rt_${selTeam}`)
+      .on('postgres_changes', { event:'INSERT', schema:'public', table:'team_messages' }, payload=>{
+        const row = payload.new;
+        // Ignorer les messages d'une autre équipe
+        if (String(row.team_id) !== String(selTeam)) return;
+        const nm = { id:row.id, userId:row.user_id, from:row.user_name, text:row.content, ts:row.created_at };
         const ex = TEAM_CHAT.byTeam[selTeam] || [];
-        if (!ex.find(x=>x.id===m.id)) { TEAM_CHAT.byTeam[selTeam] = [...ex, nm]; TEAM_CHAT.notify(); }
+        // Déjà présent (message optimiste confirmé ou doublon) → ne rien faire
+        if (ex.some(x=>x.id===nm.id)) return;
+        // Remplacer le tmp_ optimiste correspondant s'il existe, sinon ajouter à la suite
+        const without = ex.filter(x=>!(x.id.startsWith('tmp_')&&x.from===nm.from&&x.text===nm.text));
+        TEAM_CHAT.byTeam[selTeam] = [...without, nm].sort((a,b)=>a.ts.localeCompare(b.ts));
+        TEAM_CHAT.notify();
       })
-      .subscribe();
-    return () => supabase.removeChannel(channel);
+      .subscribe((status)=>{
+        if (status === 'CHANNEL_ERROR') console.warn('[team_chat] RT subscription error');
+      });
+
+    teamChannelRef.current = channel;
+    return () => {
+      cancelled = true;
+      supabase.removeChannel(channel);
+      teamChannelRef.current = null;
+    };
   },[selTeam]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const REPLIES = [t('messages.quick_reply_1'),t('messages.quick_reply_2'),t('messages.quick_reply_3'),t('messages.quick_reply_4'),t('messages.quick_reply_5'),t('messages.quick_reply_6')];
@@ -4349,18 +4301,29 @@ function MessagingView({ user, openWith }) {
     if (!teamMsg.trim()||!selTeam) return;
     const text = teamMsg.trim();
     setTeamMsg("");
-    // Insert first to get the real UUID, then add locally with that id.
-    // This ensures the Realtime dedup (find by id) works correctly.
-    const { data } = await supabase
+    // 1. Afficher le message immédiatement (optimiste) avec un id temporaire
+    const tmpId = `tmp_${Date.now()}`;
+    const tmpMsg = { id:tmpId, userId:user.id, from:user.name, text, ts:new Date().toISOString() };
+    TEAM_CHAT.byTeam[selTeam] = [...(TEAM_CHAT.byTeam[selTeam]||[]), tmpMsg];
+    TEAM_CHAT.notify();
+    // 2. Persister dans Supabase
+    const { data, error } = await supabase
       .from('team_messages')
       .insert({ team_id:selTeam, user_id:user.id, user_name:user.name, content:text })
       .select()
       .single();
+    const ex = TEAM_CHAT.byTeam[selTeam] || [];
     if (data) {
+      // Remplacer le message tmp par le vrai message Supabase (avec UUID réel)
+      // postgres_changes notifie automatiquement les autres membres — pas besoin de broadcast manuel
       const nm = { id:data.id, userId:data.user_id, from:data.user_name, text:data.content, ts:data.created_at };
-      const ex = TEAM_CHAT.byTeam[selTeam] || [];
-      if (!ex.find(x=>x.id===nm.id)) { TEAM_CHAT.byTeam[selTeam] = [...ex, nm]; TEAM_CHAT.notify(); }
+      TEAM_CHAT.byTeam[selTeam] = ex.map(m=>m.id===tmpId ? nm : m);
+    } else {
+      // Insert échoué : garder le préfixe tmp_ pour qu'il survive au merge pending + marquer failed
+      if (error) console.warn('[team_chat] insert error:', error.message);
+      TEAM_CHAT.byTeam[selTeam] = ex.map(m=>m.id===tmpId ? {...m, failed:true} : m);
     }
+    TEAM_CHAT.notify();
   };
 
   const openConvWith = name => {
@@ -4601,11 +4564,11 @@ function MessagingView({ user, openWith }) {
                   )}
                   <div style={{maxWidth:"68%"}}>
                     {!isMe && <div style={{marginBottom:3,paddingLeft:2}}><UserBadge name={msg.from} size="sm" showLevel showInsignes/></div>}
-                    <div style={{padding:"10px 14px",borderRadius:isMe?"16px 16px 4px 16px":"16px 16px 16px 4px",background:isMe?`${C.purple}22`:C.card,border:`1px solid ${isMe?C.purple+"55":C.border}`,fontSize:13,color:C.text,lineHeight:1.5}}>
+                    <div style={{padding:"10px 14px",borderRadius:isMe?"16px 16px 4px 16px":"16px 16px 16px 4px",background:isMe?`${C.purple}22`:C.card,border:`1px solid ${isMe?(msg.failed?"#ef444455":C.purple+"55"):C.border}`,fontSize:13,color:C.text,lineHeight:1.5,opacity:msg.id.startsWith('tmp_')?0.6:1}}>
                       {msg.text}
                     </div>
-                    <div style={{fontSize:9,color:C.sub,marginTop:3,textAlign:isMe?"right":"left"}}>
-                      {timeAgo(msg.ts)}
+                    <div style={{fontSize:9,color:msg.failed?"#ef4444":C.sub,marginTop:3,textAlign:isMe?"right":"left"}}>
+                      {msg.failed ? "⚠️ Non envoyé — vérifiez votre connexion" : (msg.id.startsWith('tmp_') ? "Envoi…" : timeAgo(msg.ts))}
                     </div>
                   </div>
                   {isMe && <Avatar name={user.name} size={26} color={C.purple} photo={user.avatar}/>}
@@ -4826,11 +4789,11 @@ function ProfileView({ user, onLogout, onUpdate, onGoSupport, onGoAdmin }) {
                         </div>
                         <div style={{flex:1,minWidth:0}}>
                           <div style={{display:"flex",alignItems:"center",gap:6}}>
-                            <span style={{fontSize:13,fontWeight:700,color:tier?C.text:C.sub}}>{def.name}</span>
+                            <span style={{fontSize:13,fontWeight:700,color:tier?C.text:C.sub}}>{t(def.nameKey)}</span>
                             {tier && <span style={{fontSize:13}}>{tier.medal}</span>}
                             {!tier && <span style={{fontSize:10,color:C.sub,background:C.card,borderRadius:4,padding:"1px 6px"}}>{t('profile.locked')}</span>}
                           </div>
-                          <div style={{fontSize:10,color:C.sub,marginTop:1}}>{def.desc} · {val}/{(tier?next||def.tiers[def.tiers.length-1]:def.tiers[0]).min}</div>
+                          <div style={{fontSize:10,color:C.sub,marginTop:1}}>{t(def.descKey)} · {val}/{(tier?next||def.tiers[def.tiers.length-1]:def.tiers[0]).min}</div>
                         </div>
                       </div>
                       <div style={{height:4,borderRadius:2,background:C.card,overflow:"hidden"}}>
@@ -4860,7 +4823,7 @@ function ProfileView({ user, onLogout, onUpdate, onGoSupport, onGoAdmin }) {
                   const preview = nc.special==="gold" ? "linear-gradient(90deg,#FFD700,#FFA500,#FFD700)" : null;
                   return (
                     <button key={nc.id} onClick={locked?undefined:()=>onUpdate({...user,nameColor:nc.value})}
-                      title={locked?t('profile.level_req',{n:nc.minLevel}):nc.label}
+                      title={locked?t('profile.level_req',{n:nc.minLevel}):t('colors.'+nc.id)}
                       style={{display:"flex",alignItems:"center",gap:6,padding:"6px 12px",borderRadius:20,cursor:locked?"not-allowed":"pointer",fontFamily:C.font,fontWeight:600,fontSize:12,
                         background:active?`${C.accent}18`:C.card2,
                         border:`1.5px solid ${active?C.accent:C.border}`,
@@ -4868,7 +4831,7 @@ function ProfileView({ user, onLogout, onUpdate, onGoSupport, onGoAdmin }) {
                       <span style={{width:12,height:12,borderRadius:"50%",display:"inline-block",flexShrink:0,
                         background:nc.special==="gold"?"linear-gradient(135deg,#FFD700,#FFA500)":nc.value||C.text,
                         border:`1px solid rgba(255,255,255,.2)`}}/>
-                      <ColoredName name={nc.label} nameColor={nc.value}/>
+                      <ColoredName name={t('colors.'+nc.id)} nameColor={nc.value}/>
                       {locked && <span style={{position:"absolute",top:-6,right:-4,fontSize:9,background:C.card2,border:`1px solid ${C.border}`,borderRadius:6,padding:"1px 4px",color:C.sub}}>{t('profile.level_short',{n:nc.minLevel})}</span>}
                     </button>
                   );
@@ -6026,6 +5989,7 @@ export default function App() {
   const [selTerrain,setTerrain] = useState(null);
   // Start with local TERRAINS constant; API load overrides in useEffect below
   const [terrains,setTerrains] = useState(TERRAINS);
+  const [teams, setTeams] = useState([]);
   const [showInvites,setShowInvites]       = useState(false);
   const [openMsgWith,setOpenMsgWith]       = useState(null);
   const [maintenanceBanner,setMaintenanceBanner] = useState(null);
@@ -6057,9 +6021,9 @@ export default function App() {
   // Preload all Supabase profiles into DB so UserBadge can resolve nameColor for any user
   useEffect(()=>{
     supabase.from('profiles')
-      .select('id,username,name,name_color,xp,referral_count,terrains,matchs')
+      .select('id,username,name_color,xp,referral_count')    
       .then(({ data }) => {
-        if (!data?.length) return;
+    if (!data?.length) return;
         data.forEach(p => {
           const uname = p.name || p.username;
           if (!uname) return;
@@ -6102,7 +6066,38 @@ export default function App() {
         .then(d => { if (d?.terrains?.length) setTerrains([...TERRAINS, ...d.terrains]); })
         .catch(() => {});
     });
-  },[]);
+    },[]);
+    // Load teams from Supabase; fallback to Express backend
+useEffect(()=>{
+  supabase
+    .from('teams')
+    .select('*, team_members!left(status)')
+    .then(({ data, error }) => {
+      if (!error && data) {
+        setTeams(data.map(t => ({
+          id: t.id,
+          name: t.name,
+          sport: t.sport,
+          city: t.city,
+          lat: t.lat != null ? parseFloat(t.lat) : null,
+          lng: t.lng != null ? parseFloat(t.lng) : null,
+          level: t.level,
+          open: t.open,
+          avatar: t.avatar,
+          isDemo: t.is_demo,
+          members: (t.team_members || []).filter(m => m.status === 'approved').length,
+          distanceKm: null,
+        })));
+        return;
+      }
+      console.warn('[RVF] Supabase teams load error:', error);
+      // Fallback: Express backend
+      fetch(`${API}/api/teams`, { signal: AbortSignal.timeout(5000) })
+        .then(r => r.ok ? r.json() : null)
+        .then(d => { if (d?.length) setTeams(d); })
+        .catch(() => {});
+    });
+},[]);
 
   // Maintenance banner (shown globally when active)
   useEffect(()=>{
