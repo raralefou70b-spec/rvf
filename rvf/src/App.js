@@ -431,15 +431,9 @@ const CITIES = {
 };
 
 // ─── AUTH ─────────────────────────────────────────────────────────────────────
-const DB = [
-  { id:"u1", email:"demo@rvf.app",   password:"demo123", name:"Alex Martin", city:"Paris",   level:"Intermédiaire", sports:["football","basketball"],     bio:"Passionné de foot et basket.",       avatar:null, phone:"", verified:true,  terrains:3, matchs:38, teams:2, citiesVisited:5,  xp:2100,  nameColor:"#4DABF7", record:{ football:{w:18,l:12}, basketball:{w:6,l:2} }, referralCode:"ALEX1234", referralCount:12 },
-  { id:"u2", email:"lucas@rvf.app",  password:"pass",    name:"Lucas M.",    city:"Paris",   level:"Amateur",       sports:["football"],                  bio:"Footeux du dimanche ⚽",              avatar:null, phone:"", verified:true,  terrains:1, matchs:12, teams:1, citiesVisited:1,  xp:450,   nameColor:null,      record:{ football:{w:5,l:7} },                                   referralCode:"LUCAS001", referralCount:2  },
-  { id:"u3", email:"sara@rvf.app",   password:"pass",    name:"Sara K.",     city:"Berlin",  level:"Confirmé",      sports:["tennis","padel"],            bio:"Passionnée de tennis et padel.",     avatar:null, phone:"", verified:true,  terrains:2, matchs:28, teams:1, citiesVisited:4,  xp:1600,  nameColor:"#51CF66", record:{ tennis:{w:19,l:5}, padel:{w:3,l:1} },                  referralCode:"SARA2024", referralCount:11 },
-  { id:"u4", email:"tom@rvf.app",    password:"pass",    name:"Tom B.",      city:"Londres", level:"Intermédiaire", sports:["rugby","football"],          bio:"Rugby player from London.",          avatar:null, phone:"", verified:false, terrains:0, matchs:15, teams:2, citiesVisited:2,  xp:700,   nameColor:null,      record:{ rugby:{w:9,l:4}, football:{w:1,l:1} },                   referralCode:"TOM2024",  referralCount:0  },
-  { id:"u5", email:"jade@rvf.app",   password:"pass",    name:"Jade R.",     city:"Rio",     level:"Expert",        sports:["volleyball","football"],     bio:"Carioca dans l'âme 🌊",              avatar:null, phone:"", verified:true,  terrains:5, matchs:67, teams:3, citiesVisited:8,  xp:5600,  nameColor:"#CC5DE8", record:{ volleyball:{w:42,l:10}, football:{w:12,l:3} },          referralCode:"JADE2024", referralCount:27 },
-  { id:"u6", email:"carlos@rvf.app", password:"pass",    name:"Carlos M.",   city:"Madrid",  level:"Confirmé",      sports:["padel","football","tennis"], bio:"Padel lover & football fanatic.",    avatar:null, phone:"", verified:true,  terrains:3, matchs:45, teams:2, citiesVisited:6,  xp:22000, nameColor:"gold",    record:{ padel:{w:20,l:8}, football:{w:14,l:2}, tennis:{w:1,l:0} }, referralCode:"CARLOS24", referralCount:53 },
-  { id:"u7", email:"noe@rvf.app",    password:"pass",    name:"Noé V.",      city:"Tokyo",   level:"Amateur",       sports:["basketball","pingpong"],     bio:"Tokyo baller 🏀🏓",                  avatar:null, phone:"", verified:false, terrains:1, matchs:9,  teams:1, citiesVisited:1,  xp:200,   nameColor:null,      record:{ basketball:{w:5,l:4}, pingpong:{w:0,l:0} },              referralCode:"NOE2024",  referralCount:0  },
-];
+// Populated at runtime from the Supabase `profiles` table and the Express `/api/users` route —
+// no hardcoded demo accounts, so friend search only ever shows real registered users.
+const DB = [];
 
 const getUserBadge = name => { const u=DB.find(x=>x.name===name); return u?getReferralLevel(u.referralCount||0).badge:""; };
 
@@ -561,32 +555,53 @@ RT.like = (tid, pid, name) => {
   RT.notify();
 };
 
-// Messages
-const CHAT = createStore({ convs:{} });
-CHAT.cid = (a,b) => [a,b].sort().join("::");
-CHAT.send = (from, to, text) => {
-  const id = CHAT.cid(from,to);
-  if (!CHAT.convs[id]) CHAT.convs[id] = [];
-  CHAT.convs[id].push({ id:Date.now(), from, text, ts:new Date().toISOString(), read:false });
-  CHAT.notify();
+// Messages — backed by the Express /api/messages route (Postgres direct_messages table)
+const CHAT = createStore({ convs:{}, convList:[] });
+CHAT.cid = (a,b) => [String(a),String(b)].sort().join("::");
+CHAT.loadConversations = async myId => {
+  try {
+    const res = await fetch(`${API}/api/messages/conversations`, { headers: authHeader() });
+    if (!res.ok) return;
+    CHAT.convList = await res.json();
+    CHAT.notify();
+  } catch {}
 };
-CHAT.markRead = (cid, user) => {
-  if (!CHAT.convs[cid]) return;
-  CHAT.convs[cid] = CHAT.convs[cid].map(m => m.from!==user ? {...m,read:true} : m);
-  CHAT.notify();
+CHAT.loadThread = async (myId, otherId) => {
+  try {
+    const res = await fetch(`${API}/api/messages/${otherId}`, { headers: authHeader() });
+    if (!res.ok) return;
+    const msgs = await res.json();
+    CHAT.convs[CHAT.cid(myId,otherId)] = msgs;
+    CHAT.notify();
+  } catch {}
 };
-CHAT.list = user => Object.entries(CHAT.convs)
-  .filter(([id]) => id.includes(user))
-  .map(([id,msgs]) => ({
-    id, msgs,
-    other: id.split("::").find(n=>n!==user),
-    last: msgs[msgs.length-1],
-    unread: msgs.filter(m=>m.from!==user&&!m.read).length,
-  }))
-  .sort((a,b) => new Date(b.last?.ts||0)-new Date(a.last?.ts||0));
-CHAT.totalUnread = user => Object.entries(CHAT.convs)
-  .filter(([id]) => id.includes(user))
-  .reduce((s,[,msgs]) => s+msgs.filter(m=>m.from!==user&&!m.read).length, 0);
+CHAT.send = async (from, to, text) => {
+  try {
+    const res = await fetch(`${API}/api/messages/${to}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', ...authHeader() },
+      body: JSON.stringify({ content: text }),
+    });
+    if (!res.ok) return;
+    const msg = await res.json();
+    const id = CHAT.cid(from,to);
+    CHAT.convs[id] = [...(CHAT.convs[id]||[]), msg];
+    CHAT.notify();
+    await CHAT.loadConversations(from);
+  } catch {}
+};
+CHAT.markRead = async (cid, myId) => {
+  const other = cid.split("::").find(id=>id!==String(myId));
+  if (!other) return;
+  try {
+    await fetch(`${API}/api/messages/${other}/read`, { method:'POST', headers: authHeader() });
+    if (CHAT.convs[cid]) CHAT.convs[cid] = CHAT.convs[cid].map(m => String(m.to)!==String(myId) ? m : {...m,read:true});
+    CHAT.convList = CHAT.convList.map(c => c.id!==cid ? c : {...c, unread:0});
+    CHAT.notify();
+  } catch {}
+};
+CHAT.list = () => CHAT.convList;
+CHAT.totalUnread = () => CHAT.convList.reduce((s,c)=>s+(c.unread||0),0);
 
 // Team chat (group messages per team)
 const TEAM_CHAT = createStore({ byTeam:{}, lastRead:{} });
@@ -760,10 +775,6 @@ TERRAINS.forEach(t => {
   }));
 });
 setTimeout(() => {
-  CHAT.send("Lucas M.","Alex Martin","Salut ! Tu joues ce soir ? 🏀");
-  CHAT.send("Lucas M.","Alex Martin","On est déjà 3, il manque un joueur");
-  CHAT.send("Carlos M.","Alex Martin","Match dimanche 10h au Stade Charléty ⚽");
-  CHAT.send("Sara K.","Alex Martin","Le terrain Pigalle est libre demain ?");
   INV.send({from:"Lucas M.", to:"Alex Martin", terrainId:3, terrainName:"Playground Pigalle", sport:"basketball", day:"sat", hour:"14h", note:"On fait une partie ? On est déjà 3 🏀"});
   INV.send({from:"Carlos M.",to:"Alex Martin", terrainId:1, terrainName:"Stade Charléty",    sport:"football",   day:"sun", hour:"10h", note:"Match amical dimanche matin ⚽"});
   // Historique visites Alex Martin (demo)
@@ -3715,7 +3726,7 @@ function UserProfileModal({ profile, currentUser, onClose, onGoToMessages }) {
     if (!hasPending) FRIEND_REQ.send(currentUser.id, currentUser.name, profile.id);
   };
   const startChat = () => {
-    if (onGoToMessages) { onGoToMessages(profile.name); onClose(); }
+    if (onGoToMessages) { onGoToMessages(profile.id); onClose(); }
     else onClose();
   };
   return (
@@ -4054,7 +4065,7 @@ function SocialView({ user, terrains, onGoToMessages }) {
                         </div>
                       </div>
                       <div style={{display:"flex",flexDirection:"column",gap:6,alignItems:"flex-end",flexShrink:0}}>
-                        <button onClick={e=>{e.stopPropagation();CHAT.cid(user.name,u.name);if(onGoToMessages)onGoToMessages(u.name);}}
+                        <button onClick={e=>{e.stopPropagation();if(onGoToMessages)onGoToMessages(u.id);}}
                           style={{background:C.accent,border:"none",borderRadius:8,padding:"6px 12px",color:"#06090f",fontSize:11,fontWeight:700,cursor:"pointer",fontFamily:C.font}}>
                           {t('social.message')}
                         </button>
@@ -4204,9 +4215,9 @@ function MessagingView({ user, openWith }) {
   const isMobile = useIsMobile();
 
   // DM derived
-  const convs    = CHAT.list(user.name);
+  const convs    = CHAT.list();
   const selConv  = sel ? CHAT.convs[sel]||[] : [];
-  const selOther = sel ? sel.split("::").find(n=>n!==user.name) : null;
+  const selOther = sel ? sel.split("::").find(id=>id!==String(user.id)) : null;
 
   // Team derived
   const userTeams = TEAMS_DATA.filter(t =>
@@ -4215,24 +4226,30 @@ function MessagingView({ user, openWith }) {
   const sp = id => SPORTS.find(s=>s.id===id);
   const selTeamObj  = selTeam ? TEAMS_DATA.find(t=>t.id===selTeam) : null;
   const teamMsgs    = selTeam ? TEAM_CHAT.messages(selTeam) : [];
-  const dmUnread    = CHAT.totalUnread(user.name);
+  const dmUnread    = CHAT.totalUnread();
   const teamUnread  = TEAM_CHAT.totalUnread(user.id, userTeams.map(t=>t.id));
 
-  const getProfile = name => DB.find(u=>u.name===name) || { name, id:null, city:"", level:"Amateur", bio:"", avatar:null, sports:[] };
-  const openProfile = name => { if(name!==user.name) setViewProfile(getProfile(name)); };
+  const getProfile = id => DB.find(u=>String(u.id)===String(id)) || { name:"?", id, city:"", level:"Amateur", bio:"", avatar:null, sports:[] };
+  const openProfile = id => { if(String(id)!==String(user.id)) setViewProfile(getProfile(id)); };
   const selectConv  = id => { setSel(id); if(isMobile) setShowChat(true); };
+
+  // Load the conversation list once, then keep it in sync while this view is open
+  useEffect(()=>{ CHAT.loadConversations(user.id); },[user.id]);
 
   // Open DM when navigating from another view
   useEffect(()=>{
     if (!openWith) return;
-    const cid = CHAT.cid(user.name, openWith);
+    const cid = CHAT.cid(user.id, openWith);
     setSel(cid); setMsgTab("dm");
     if (isMobile) setShowChat(true);
   },[openWith]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  // Load history for the selected conversation
+  useEffect(()=>{ if(sel && selOther) CHAT.loadThread(user.id, selOther); },[sel]); // eslint-disable-line react-hooks/exhaustive-deps
+
   // DM auto-scroll + mark-read
   useEffect(()=>{ msgEndRef.current?.scrollIntoView({behavior:"smooth"}); },[selConv.length]);
-  useEffect(()=>{ if(sel) CHAT.markRead(sel,user.name); },[sel,selConv.length]);
+  useEffect(()=>{ if(sel) CHAT.markRead(sel,user.id); },[sel,selConv.length]);
 
   // Team chat auto-scroll + mark-read
   useEffect(()=>{ teamMsgEndRef.current?.scrollIntoView({behavior:"smooth"}); },[selTeam,teamMsgs.length]);
@@ -4286,15 +4303,9 @@ function MessagingView({ user, openWith }) {
     };
   },[selTeam]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const REPLIES = [t('messages.quick_reply_1'),t('messages.quick_reply_2'),t('messages.quick_reply_3'),t('messages.quick_reply_4'),t('messages.quick_reply_5'),t('messages.quick_reply_6')];
-  const simulateReply = useCallback(from => {
-    setTimeout(()=>CHAT.send(from,user.name,REPLIES[Math.floor(Math.random()*REPLIES.length)]), 2000+Math.random()*2000);
-  },[user.name]);
-
   const send = () => {
     if (!newMsg.trim()||!selOther) return;
-    CHAT.send(user.name,selOther,newMsg.trim());
-    simulateReply(selOther);
+    CHAT.send(user.id,selOther,newMsg.trim());
     setNewMsg("");
   };
 
@@ -4327,10 +4338,11 @@ function MessagingView({ user, openWith }) {
     TEAM_CHAT.notify();
   };
 
-  const openConvWith = name => {
-    if (!name.trim()) return;
-    const id = CHAT.cid(user.name, name.trim());
-    setSel(id); setShowNew(false); setNewTo(""); if(isMobile) setShowChat(true);
+  const openConvWith = otherId => {
+    if (!otherId) return;
+    const id = CHAT.cid(user.id, otherId);
+    setSel(id); setShowNew(false); setNewTo("");
+    if (isMobile) setShowChat(true);
   };
 
   const switchTab = tab => {
@@ -4371,10 +4383,8 @@ function MessagingView({ user, openWith }) {
             {showNew && (()=>{
               const friendIds   = FRIENDS.list(user.id);
               const friendList  = friendIds.map(id=>DB.find(u=>u.id===id)).filter(Boolean);
-              const otherPlayers= SEED_PLAYERS.filter(p=>p.name!==user.name&&!friendList.find(f=>f.name===p.name));
-              const allPlayers  = [...friendList.map(f=>({name:f.name,isFriend:true})), ...otherPlayers.map(p=>({name:p.name,isFriend:false}))];
               const q = newTo.trim().toLowerCase();
-              const filtered = q ? allPlayers.filter(p=>p.name.toLowerCase().includes(q)) : allPlayers;
+              const filtered = q ? friendList.filter(f=>f.name.toLowerCase().includes(q)) : friendList;
               return (
                 <div style={{padding:12,borderBottom:`1px solid ${C.border}`,background:C.card2}}>
                   <div style={{fontSize:11,color:C.sub,fontWeight:700,marginBottom:8,textTransform:"uppercase",letterSpacing:1}}>{t('messages.new_conv')}</div>
@@ -4383,13 +4393,13 @@ function MessagingView({ user, openWith }) {
                   <div style={{display:"flex",flexDirection:"column",gap:4,maxHeight:180,overflowY:"auto"}}>
                     {filtered.length===0
                       ? <div style={{fontSize:12,color:C.sub,textAlign:"center",padding:"12px 0"}}>{t('messages.no_player_found')}</div>
-                      : filtered.map(p=>(
-                        <button key={p.name} onClick={()=>openConvWith(p.name)}
+                      : filtered.map(f=>(
+                        <button key={f.id} onClick={()=>openConvWith(f.id)}
                           style={{display:"flex",alignItems:"center",gap:9,padding:"7px 10px",borderRadius:9,cursor:"pointer",fontFamily:C.font,background:C.card,border:`1px solid ${C.border}`,color:C.text,textAlign:"left",width:"100%"}}>
-                          <Avatar name={p.name} size={28} color={p.isFriend?C.accent:C.sub} photo={DB.find(u=>u.name===p.name)?.avatar}/>
+                          <Avatar name={f.name} size={28} color={C.accent} photo={f.avatar}/>
                           <div style={{flex:1,minWidth:0}}>
-                            <UserBadge name={p.name} user={DB.find(x=>x.name===p.name)} size="sm" showInsignes={false}/>
-                            {p.isFriend&&<div style={{fontSize:10,color:C.accent,marginTop:1}}>{t('messages.friends_label')}</div>}
+                            <UserBadge name={f.name} user={f} size="sm" showInsignes={false}/>
+                            <div style={{fontSize:10,color:C.accent,marginTop:1}}>{t('messages.friends_label')}</div>
                           </div>
                           <span style={{fontSize:11,color:C.sub}}>💬</span>
                         </button>
@@ -4402,26 +4412,29 @@ function MessagingView({ user, openWith }) {
             <div style={{flex:1,overflowY:"auto"}}>
               {convs.length===0
                 ? <div style={{padding:20,textAlign:"center",color:C.sub,fontSize:13}}><div style={{fontSize:32,marginBottom:8}}>💬</div>{t('messages.no_conversations')}</div>
-                : convs.map(conv=>(
+                : convs.map(conv=>{
+                    const otherProfile = getProfile(conv.other);
+                    return (
                     <div key={conv.id} onClick={()=>selectConv(conv.id)}
                       style={{padding:"11px 14px",borderBottom:`1px solid ${C.border}`,cursor:"pointer",background:sel===conv.id?C.aLow:C.card,borderLeft:`3px solid ${sel===conv.id?C.accent:"transparent"}`}}>
                       <div style={{display:"flex",gap:10,alignItems:"center"}}>
                         <div style={{position:"relative",flexShrink:0}}>
-                          <Avatar name={conv.other} size={36} color={C.accent}/>
+                          <Avatar name={otherProfile.name} size={36} color={C.accent} photo={otherProfile.avatar}/>
                           {conv.unread>0 && <div style={{position:"absolute",top:-2,right:-2,width:16,height:16,borderRadius:"50%",background:C.accent,display:"flex",alignItems:"center",justifyContent:"center",fontSize:9,fontWeight:800,color:"#06090f"}}>{conv.unread}</div>}
                         </div>
                         <div style={{flex:1,minWidth:0}}>
                           <div style={{display:"flex",justifyContent:"space-between"}}>
-                            <UserBadge name={conv.other} size="sm" showLevel={false} showInsignes={false}/>
+                            <UserBadge name={otherProfile.name} user={otherProfile} size="sm" showLevel={false} showInsignes={false}/>
                             <span style={{fontSize:10,color:C.sub}}>{conv.last?timeAgo(conv.last.ts):""}</span>
                           </div>
                           <div style={{fontSize:11,color:conv.unread>0?C.accent:C.sub,marginTop:2,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis",fontWeight:conv.unread>0?700:400}}>
-                            {conv.last?.from===user.name?t('common.you_prefix'):""}{conv.last?.text||t('common.new_conversation')}
+                            {String(conv.last?.from)===String(user.id)?t('common.you_prefix'):""}{conv.last?.text||t('common.new_conversation')}
                           </div>
                         </div>
                       </div>
                     </div>
-                  ))
+                    );
+                  })
               }
             </div>
           </>
@@ -4466,16 +4479,18 @@ function MessagingView({ user, openWith }) {
       </div>
 
       {/* ── DM chat panel ── */}
-      {msgTab==="dm" && sel && selOther ? (
+      {msgTab==="dm" && sel && selOther ? (()=>{
+        const selOtherProfile = getProfile(selOther);
+        return (
         <div style={{flex:1,display:isMobile&&!showChat?"none":"flex",flexDirection:"column",background:C.bg}}>
           <div style={{padding:"12px 20px",background:C.card,borderBottom:`1px solid ${C.border}`,display:"flex",alignItems:"center",gap:12,flexShrink:0}}>
             {isMobile && <button onClick={()=>setShowChat(false)} style={{background:"none",border:"none",color:C.accent,fontSize:18,cursor:"pointer",padding:"0 6px 0 0",flexShrink:0}}>←</button>}
             <div onClick={()=>openProfile(selOther)} style={{cursor:"pointer",flexShrink:0}}>
-              <Avatar name={selOther} size={38} color={C.accent}/>
+              <Avatar name={selOtherProfile.name} size={38} color={C.accent} photo={selOtherProfile.avatar}/>
             </div>
             <div style={{flex:1,cursor:"pointer"}} onClick={()=>openProfile(selOther)}>
               <div style={{fontSize:15,fontWeight:700,color:C.text,display:"flex",alignItems:"center",gap:6}}>
-                <UserBadge name={selOther} user={DB.find(x=>x.name===selOther)} size="md" showLevel showInsignes/>
+                <UserBadge name={selOtherProfile.name} user={selOtherProfile} size="md" showLevel showInsignes/>
                 <span style={{fontSize:9,color:C.sub,fontWeight:400,border:`1px solid ${C.border}`,borderRadius:5,padding:"1px 5px"}}>voir profil</span>
               </div>
               <div style={{display:"flex",alignItems:"center",gap:6}}>
@@ -4488,16 +4503,17 @@ function MessagingView({ user, openWith }) {
             {selConv.length===0 && (
               <div style={{textAlign:"center",color:C.sub,fontSize:13,marginTop:40}}>
                 <div style={{fontSize:40,marginBottom:8}}>👋</div>
-                {t('messages.start_conv', {name: selOther})}
+                {t('messages.start_conv', {name: selOtherProfile.name})}
               </div>
             )}
             {selConv.map(msg=>{
-              const isMe=msg.from===user.name;
+              const isMe=String(msg.from)===String(user.id);
+              const fromProfile = isMe ? null : getProfile(msg.from);
               return (
                 <div key={msg.id} style={{display:"flex",justifyContent:isMe?"flex-end":"flex-start",gap:8,alignItems:"flex-end"}}>
                   {!isMe && (
                     <div onClick={()=>openProfile(msg.from)} style={{cursor:"pointer",flexShrink:0}}>
-                      <Avatar name={msg.from} size={26} color={C.accent}/>
+                      <Avatar name={fromProfile.name} size={26} color={C.accent} photo={fromProfile.avatar}/>
                     </div>
                   )}
                   <div style={{maxWidth:"68%"}}>
@@ -4518,7 +4534,7 @@ function MessagingView({ user, openWith }) {
             <div style={{flex:1,background:C.card2,border:`1px solid ${C.border}`,borderRadius:14,padding:"10px 14px",display:"flex",alignItems:"center",gap:8}}>
               <textarea value={newMsg} onChange={e=>setNewMsg(e.target.value)}
                 onKeyDown={e=>{if(e.key==="Enter"&&!e.shiftKey){e.preventDefault();send();}}}
-                placeholder={t('common.message_to',{name:selOther})} rows={1}
+                placeholder={t('common.message_to',{name:selOtherProfile.name})} rows={1}
                 style={{flex:1,background:"none",border:"none",outline:"none",color:C.text,fontSize:13,fontFamily:C.font,resize:"none",lineHeight:1.4}}/>
             </div>
             <button onClick={send} disabled={!newMsg.trim()}
@@ -4527,9 +4543,11 @@ function MessagingView({ user, openWith }) {
             </button>
           </div>
         </div>
+        );
+      })()
 
       /* ── Team chat panel ── */
-      ) : msgTab==="teams" && selTeam && selTeamObj ? (
+      : msgTab==="teams" && selTeam && selTeamObj ? (
         <div style={{flex:1,display:isMobile&&!showChat?"none":"flex",flexDirection:"column",background:C.bg}}>
           {/* Team header */}
           <div style={{padding:"12px 20px",background:C.card,borderBottom:`1px solid ${C.border}`,display:"flex",alignItems:"center",gap:12,flexShrink:0}}>
@@ -4612,7 +4630,7 @@ function MessagingView({ user, openWith }) {
       )}
 
       {viewProfile && <UserProfileModal profile={viewProfile} currentUser={user} onClose={()=>setViewProfile(null)}
-        onGoToMessages={name=>{ selectConv(CHAT.cid(user.name,name)); setMsgTab("dm"); setViewProfile(null); }}/>}
+        onGoToMessages={id=>{ selectConv(CHAT.cid(user.id,id)); setMsgTab("dm"); setViewProfile(null); }}/>}
     </div>
   );
 }
@@ -6019,6 +6037,9 @@ export default function App() {
     });
   },[]);
 
+  // Keep the DM unread badge fresh even before the user opens the Messages view
+  useEffect(()=>{ if (user?.id) CHAT.loadConversations(user.id); },[user?.id]);
+
   // Preload all Supabase profiles into DB so UserBadge can resolve nameColor for any user
   useEffect(()=>{
     supabase.from('profiles')
@@ -6048,6 +6069,23 @@ export default function App() {
         PROFILES_STORE.notify();
       });
   },[]);
+
+  // Preload registered Express/Postgres users into DB so friend search, badges and friend
+  // lists can resolve them (DB has no built-in demo accounts — only real registered users)
+  useEffect(()=>{
+    if (!user?.id) return;
+    fetch(`${API}/api/users`, { headers: authHeader(), signal: AbortSignal.timeout(4000) })
+      .then(r => r.ok ? r.json() : [])
+      .then(list => {
+        list.forEach(p => {
+          const existing = DB.find(u => String(u.id)===String(p.id));
+          if (existing) { existing.city = p.city||""; }
+          else DB.push({ id:p.id, name:p.name, city:p.city||"", level:"Amateur", sports:[], bio:"", avatar:null, verified:false, xp:0, referralCount:0 });
+        });
+        PROFILES_STORE.notify();
+      })
+      .catch(()=>{});
+  },[user?.id]);
 
   // Load terrains from Supabase; merge with hardcoded TERRAINS as fallback
   useEffect(()=>{
@@ -6332,7 +6370,7 @@ useEffect(()=>{
               <div style={{display:"flex",gap:3}}>
                 {NAV.map(n=>{
                   const userTeamIds = user ? TEAMS_DATA.filter(t=>(ROSTER[t.id]||[]).some(m=>m.id===user.id)||t.captainId===user.id).map(t=>t.id) : [];
-                  const unread = n.id==="messages"&&user ? CHAT.totalUnread(user.name)+TEAM_CHAT.totalUnread(user.id,userTeamIds) : 0;
+                  const unread = n.id==="messages"&&user ? CHAT.totalUnread()+TEAM_CHAT.totalUnread(user.id,userTeamIds) : 0;
                   return (
                     <button key={n.id} onClick={()=>{setView(n.id);setTerrain(null);}}
                       style={{display:"flex",flexDirection:"column",alignItems:"center",gap:1,padding:"5px 14px",borderRadius:9,cursor:"pointer",position:"relative",background:view===n.id?C.aLow:"transparent",border:`1px solid ${view===n.id?C.accent+"44":"transparent"}`,color:view===n.id?C.accent:C.sub,fontSize:9,fontWeight:700,letterSpacing:1,fontFamily:C.font}}>
@@ -6395,7 +6433,7 @@ useEffect(()=>{
         <div style={{position:"fixed",bottom:0,left:0,right:0,height:"calc(56px + env(safe-area-inset-bottom))",background:C.card,borderTop:`1px solid ${C.border}`,display:"flex",zIndex:200,paddingBottom:"env(safe-area-inset-bottom)"}}>
           {NAV.map(n=>{
             const userTeamIds = user ? TEAMS_DATA.filter(t=>(ROSTER[t.id]||[]).some(m=>m.id===user.id)||t.captainId===user.id).map(t=>t.id) : [];
-            const unread = n.id==="messages"&&user ? CHAT.totalUnread(user.name)+TEAM_CHAT.totalUnread(user.id,userTeamIds) : 0;
+            const unread = n.id==="messages"&&user ? CHAT.totalUnread()+TEAM_CHAT.totalUnread(user.id,userTeamIds) : 0;
             const active = view===n.id;
             return (
               <button key={n.id} onClick={()=>{setView(n.id);setTerrain(null);}}

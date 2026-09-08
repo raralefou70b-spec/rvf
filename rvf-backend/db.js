@@ -90,6 +90,28 @@ async function init() {
       `INSERT INTO maintenance (id, active, message) VALUES (1, false, '') ON CONFLICT (id) DO NOTHING`
     ).catch(() => {});
 
+    await client.query(`CREATE EXTENSION IF NOT EXISTS pgcrypto`).catch(e => console.warn('[DB] pgcrypto extension:', e.message));
+
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS direct_messages (
+        id         UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        cid        TEXT NOT NULL,
+        from_user  TEXT NOT NULL,
+        to_user    TEXT NOT NULL,
+        content    TEXT NOT NULL,
+        read       BOOLEAN DEFAULT false,
+        created_at TIMESTAMPTZ DEFAULT NOW()
+      )
+    `).catch(e => console.warn('[DB] direct_messages table:', e.message));
+
+    await client.query(`
+      CREATE INDEX IF NOT EXISTS direct_messages_cid_idx ON direct_messages (cid, created_at)
+    `).catch(e => console.warn('[DB] direct_messages cid index:', e.message));
+
+    await client.query(`
+      CREATE INDEX IF NOT EXISTS direct_messages_unread_idx ON direct_messages (to_user, read)
+    `).catch(e => console.warn('[DB] direct_messages unread index:', e.message));
+
     // is_seeded column may not exist when terrains table was created via Supabase SQL
     try {
       const { rows } = await client.query('SELECT COUNT(*) FROM terrains WHERE is_seeded = true');
