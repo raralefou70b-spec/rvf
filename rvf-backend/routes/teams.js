@@ -104,4 +104,51 @@ router.post('/', requireAuth, async (req, res) => {
   }
 });
 
+// Membership check shared by the two message routes below
+async function isTeamMember(userId, teamId) {
+  const { rows } = await pool.query(
+    `SELECT 1 FROM team_members WHERE team_id = $1 AND user_id = $2 AND status = 'approved'
+     UNION SELECT 1 FROM teams WHERE id = $1 AND owner_id = $2`,
+    [teamId, userId]
+  );
+  return rows.length > 0;
+}
+
+// GET /api/teams/:id/messages
+router.get('/:id/messages', requireAuth, async (req, res) => {
+  try {
+    if (!(await isTeamMember(req.user.id, req.params.id)))
+      return res.status(403).json({ error: 'not_a_member' });
+    const { rows } = await pool.query(
+      `SELECT id, team_id, user_id, user_name, content, created_at
+       FROM team_messages WHERE team_id = $1 ORDER BY created_at ASC`,
+      [req.params.id]
+    );
+    res.json(rows);
+  } catch (e) {
+    console.error('GET /api/teams/:id/messages', e);
+    res.status(500).json({ error: 'server_error' });
+  }
+});
+
+// POST /api/teams/:id/messages
+router.post('/:id/messages', requireAuth, async (req, res) => {
+  const content = (req.body.content || '').trim();
+  if (!content) return res.status(400).json({ error: 'empty_message' });
+  try {
+    if (!(await isTeamMember(req.user.id, req.params.id)))
+      return res.status(403).json({ error: 'not_a_member' });
+    const { rows: [u] } = await pool.query('SELECT name FROM users WHERE id = $1', [req.user.id]);
+    const { rows } = await pool.query(
+      `INSERT INTO team_messages (team_id, user_id, user_name, content)
+       VALUES ($1, $2, $3, $4) RETURNING id, team_id, user_id, user_name, content, created_at`,
+      [req.params.id, req.user.id, u?.name || '', content]
+    );
+    res.status(201).json(rows[0]);
+  } catch (e) {
+    console.error('POST /api/teams/:id/messages', e);
+    res.status(500).json({ error: 'server_error' });
+  }
+});
+
 module.exports = router;

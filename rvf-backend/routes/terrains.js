@@ -1,6 +1,6 @@
 const router = require('express').Router();
 const { pool } = require('../db');
-const { requireAuth, optionalAuth } = require('../middleware/auth');
+const { optionalAuth, requireAdmin } = require('../middleware/auth');
 
 // Maps a DB row to the object shape the React app expects.
 // Handles both the old Express schema (fee, is_seeded) and the Supabase schema (free).
@@ -21,18 +21,56 @@ function rowToTerrain(r) {
     rating:    r.rating ? parseFloat(r.rating) : null,
     players:   r.players,
     phone:     r.phone,
+    ownerName: r.owner_name || null,
+    website:   r.website || null,
     addedBy:   r.added_by,
+    verified:  r.verified !== false,
     createdAt: r.created_at,
   };
 }
 
 // GET /api/terrains
+// - no bbox: full list (used by the admin panel)
+// - bbox + zoom < 12: lat/lng-rounded cluster counts (cheap, avoids shipping every row while zoomed out)
+// - bbox + zoom >= 12: individual terrains within the bbox, capped
 router.get('/', optionalAuth, async (req, res) => {
   try {
+    const { bbox, zoom } = req.query;
+    if (!bbox) {
+      const { rows } = await pool.query('SELECT * FROM terrains ORDER BY created_at ASC');
+      return res.json({ mode: 'terrains', terrains: rows.map(rowToTerrain) });
+    }
+
+    const parts = String(bbox).split(',').map(Number);
+    if (parts.length !== 4 || parts.some(Number.isNaN)) {
+      return res.status(400).json({ error: 'bbox invalide (attendu: minLng,minLat,maxLng,maxLat).' });
+    }
+    const [minLng, minLat, maxLng, maxLat] = parts;
+    const z = Number(zoom) || 0;
+
+    if (z < 12) {
+      const precision = Math.max(0, Math.min(4, Math.floor(z / 2)));
+      const { rows } = await pool.query(
+        `SELECT round(lat::numeric, $1) AS lat, round(lng::numeric, $1) AS lng, count(*)::int AS count
+         FROM terrains
+         WHERE lat BETWEEN $2 AND $3 AND lng BETWEEN $4 AND $5
+         GROUP BY 1, 2`,
+        [precision, minLat, maxLat, minLng, maxLng]
+      );
+      return res.json({
+        mode: 'clusters',
+        clusters: rows.map(r => ({ lat: parseFloat(r.lat), lng: parseFloat(r.lng), count: r.count })),
+      });
+    }
+
     const { rows } = await pool.query(
-      'SELECT * FROM terrains ORDER BY created_at ASC'
+      `SELECT * FROM terrains
+       WHERE lat BETWEEN $1 AND $2 AND lng BETWEEN $3 AND $4
+       ORDER BY created_at ASC
+       LIMIT 500`,
+      [minLat, maxLat, minLng, maxLng]
     );
-    res.json({ terrains: rows.map(rowToTerrain) });
+    res.json({ mode: 'terrains', terrains: rows.map(rowToTerrain) });
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: 'Erreur serveur.' });
@@ -80,7 +118,7 @@ router.post('/', optionalAuth, async (req, res) => {
 
     // Best-effort: increment user terrain count (may not exist in Supabase users table)
     if (req.user?.id) {
-      pool.query('UPDATE users SET terrains_count = terrains_count + 1 WHERE id = $1', [req.user.id]).catch(() => {});
+      pool.query('UPDATE users SET terrains_count = terrains_count + 1, xp = xp + 50 WHERE id = $1', [req.user.id]).catch(() => {});
     }
 
     res.status(201).json({ terrain: rowToTerrain(rows[0]) });
@@ -91,7 +129,7 @@ router.post('/', optionalAuth, async (req, res) => {
 });
 
 // DELETE /api/terrains/:id
-router.delete('/:id', requireAuth, async (req, res) => {
+router.delete('/:id', requireAdmin, async (req, res) => {
   const { id } = req.params;
   try {
     await pool.query('DELETE FROM terrains WHERE id = $1', [id]);

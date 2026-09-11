@@ -8,6 +8,19 @@ const pool = new Pool({
   ssl: needsSsl ? { rejectUnauthorized: false } : false,
 });
 
+// Mirrors the frontend's makeReferralCode() shape (name prefix + 4 digits), with a
+// DB-checked retry loop since this is now the authoritative source of the code.
+async function generateUniqueReferralCode(queryable, name) {
+  const prefix = (name || 'RVF').replace(/\s+/g, '').toUpperCase().slice(0, 6) || 'RVF';
+  for (let i = 0; i < 10; i++) {
+    const code = prefix + Math.floor(1000 + Math.random() * 9000);
+    const { rows } = await queryable.query('SELECT 1 FROM users WHERE referral_code = $1', [code]);
+    if (rows.length === 0) return code;
+  }
+  // Extremely unlikely fallback: timestamp suffix guarantees uniqueness
+  return prefix + Date.now().toString().slice(-6);
+}
+
 async function init() {
   const client = await pool.connect();
   try {
@@ -65,6 +78,17 @@ async function init() {
         BEGIN ALTER TABLE users ADD COLUMN blocked BOOLEAN     DEFAULT false;   EXCEPTION WHEN duplicate_column THEN NULL; END;
       END $$
     `).catch(e => console.warn('[DB] migrations:', e.message));
+
+
+    await client.query(`
+      DO $$ BEGIN
+        BEGIN ALTER TABLE terrains ADD COLUMN verified BOOLEAN NOT NULL DEFAULT true; EXCEPTION WHEN duplicate_column THEN NULL; END;
+      END $$
+    `).catch(e => console.warn('[DB] terrains.verified migration:', e.message));
+
+    await client.query(`
+      CREATE INDEX IF NOT EXISTS terrains_lat_lng_idx ON terrains (lat, lng)
+    `).catch(e => console.warn('[DB] terrains lat/lng index:', e.message));
 
     await client.query(`
       CREATE TABLE IF NOT EXISTS reports (
@@ -155,4 +179,4 @@ async function seedTerrains(client) {
   console.log(`Seeded ${SEEDED_TERRAINS.length} terrains.`);
 }
 
-module.exports = { pool, init };
+module.exports = { pool, init, generateUniqueReferralCode };

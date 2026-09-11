@@ -14,7 +14,7 @@ router.get('/', requireAuth, async (req, res) => {
   }
   try {
     const { rows } = await pool.query(
-      `SELECT id, name, city FROM users ${where} ORDER BY name ASC LIMIT 200`,
+      `SELECT id, name, city, xp, name_color, referral_count FROM users ${where} ORDER BY name ASC LIMIT 200`,
       params
     );
     res.json(rows);

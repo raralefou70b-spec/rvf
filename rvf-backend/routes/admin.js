@@ -2,6 +2,20 @@ const router = require('express').Router();
 const { pool } = require('../db');
 const { requireAdmin } = require('../middleware/auth');
 
+// GET /api/admin/users
+router.get('/users', requireAdmin, async (req, res) => {
+  try {
+    const { rows } = await pool.query(
+      `SELECT id, name, email, city, role, blocked, terrains_count, matchs_count, created_at
+       FROM users ORDER BY created_at DESC`
+    );
+    res.json(rows);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Erreur serveur.' });
+  }
+});
+
 // GET /api/admin/reports
 router.get('/reports', requireAdmin, async (req, res) => {
   try {
