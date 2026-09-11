@@ -13,6 +13,9 @@ import { Geolocation } from "@capacitor/geolocation";
 
 // Backend API base URL — set VITE_API_URL in .env for production
 const API = import.meta.env.VITE_API_URL || 'http://localhost:3001';
+// Free key from https://carto.com/basemaps/apikey — required since CARTO started
+// watermarking unauthenticated raster tile requests ("API KEY REQUIRED").
+const CARTO_API_KEY = import.meta.env.VITE_CARTO_API_KEY || '';
 
 function authHeader() {
   const t = localStorage.getItem('rvf_token');
@@ -1434,9 +1437,9 @@ function InteractiveMap({ terrains, clusters, onSelect, userPos, onMapClick, pin
     const center = userPos ? [userPos.lat, userPos.lng] : [20, 10];
     const zoom   = userPos ? 10 : 2;
     const map = L.map(wrapRef.current, { center, zoom, zoomControl: true });
-    L.tileLayer("https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png", {
+    L.tileLayer(`https://basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png${CARTO_API_KEY ? `?key=${CARTO_API_KEY}` : ''}`, {
       attribution: '© <a href="https://www.openstreetmap.org/copyright">OSM</a> © <a href="https://carto.com/attributions">CARTO</a>',
-      subdomains: "abcd", maxZoom: 20,
+      maxZoom: 20,
     }).addTo(map);
     mapRef.current = map;
     const clusterGroup = L.markerClusterGroup({ chunkedLoading: true });
@@ -1502,9 +1505,11 @@ function InteractiveMap({ terrains, clusters, onSelect, userPos, onMapClick, pin
     clusterDotsRef.current = [];
     (clusters||[]).forEach(c => {
       const radius = 10 + Math.min(14, Math.round(Math.log2(c.count + 1) * 3));
-      const dot = L.circleMarker([c.lat, c.lng], {
-        radius, weight: 2, color: "#06090f", fillColor: C.accent, fillOpacity: 0.85,
-      }).bindTooltip(String(c.count), { permanent: true, direction: "center", className: "rvf-cluster-tooltip" });
+      const size = radius * 2;
+      const dot = L.marker([c.lat, c.lng], { icon: L.divIcon({
+        html: `<div style="width:${size}px;height:${size}px;border-radius:50%;background:${C.accent};border:2px solid #06090f;box-shadow:0 3px 8px rgba(0,0,0,.6);display:flex;align-items:center;justify-content:center;color:#06090f;font-weight:800;font-size:12px;font-family:${C.font}">${c.count}</div>`,
+        iconSize:[size,size], iconAnchor:[size/2,size/2], className:"",
+      })});
       dot.addTo(map);
       clusterDotsRef.current.push(dot);
     });
@@ -1591,6 +1596,9 @@ function MapView({ onSelect, terrains, clusters, onViewportChange, user, onAddTe
         return (bM?1:0)-(aM?1:0);
       })
     : filtered;
+  // Zoomed-out map: no individual terrains loaded, only aggregate cluster counts
+  const clusterTotal = (clusters||[]).reduce((s,c)=>s+c.count, 0);
+  const displayCount = terrains.length===0 && clusterTotal>0 ? clusterTotal : filtered.length;
 
   // City suggestions when typing
   const allCities = [...new Set(terrains.map(t=>t.city).filter(Boolean))].sort();
@@ -1664,7 +1672,7 @@ function MapView({ onSelect, terrains, clusters, onViewportChange, user, onAddTe
             ))}
           </div>
           <span style={{fontSize:12,color:C.sub,flexShrink:0,whiteSpace:"nowrap"}}>
-            <span style={{color:C.accent,fontWeight:700}}>{filtered.length}</span> {tr('map.terrains', {count: filtered.length})}
+            <span style={{color:C.accent,fontWeight:700}}>{displayCount}</span> {tr('map.terrains', {count: displayCount})}
           </span>
           <button onClick={()=>setShowAdd(true)} style={{background:C.accent,border:"none",borderRadius:8,padding:"7px 12px",color:"#06090f",fontSize:12,fontWeight:700,cursor:"pointer",fontFamily:C.font,flexShrink:0}}>{tr('map.add')}</button>
           <button onClick={gpsError!==4?onRequestGps:undefined} disabled={gpsLoading||gpsError===4}
