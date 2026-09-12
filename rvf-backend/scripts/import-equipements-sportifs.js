@@ -54,7 +54,11 @@ const SPORT_MAP = {
 };
 
 const args = process.argv.slice(2);
-const dep = (args.find(a => a.startsWith('--dep=')) || '').split('=')[1] || null;
+// The source stores single-digit department codes without the INSEE leading zero
+// ("1", not "01" — verified live against the API), while Corse ("2A"/"2B") is untouched.
+// Normalize a manually-typed --dep=01 to what the source actually uses, --dep=2A stays as-is.
+const rawDep = (args.find(a => a.startsWith('--dep=')) || '').split('=')[1] || null;
+const dep = rawDep && /^0\d$/.test(rawDep) ? rawDep.slice(1) : rawDep;
 const limit = parseInt((args.find(a => a.startsWith('--limit=')) || '').split('=')[1], 10) || null;
 const dryRun = args.includes('--dry-run');
 const force = args.includes('--force');
@@ -99,6 +103,8 @@ function mapRecord(r) {
   const lights = r.equip_eclair === 'true';
   const ownerName = r.equip_prop_nom?.trim() || null;
   const website = normalizeUrl(r.equip_url);
+  const address = (r.inst_adresse || '').trim().slice(0, 200) || null;
+  const postalCode = (r.inst_cp || '').trim().slice(0, 10) || null;
 
   return [
     name,
@@ -115,11 +121,13 @@ function mapRecord(r) {
     'data.sports.gouv.fr',        // added_by — shown as attribution in the app
     ownerName,
     website,
+    address,
+    postalCode,
     `gouv:${r.equip_numero}`,     // source_id — idempotency key for this import
   ];
 }
 
-const COLS = ['name','sport','sports','city','country','surface','price','lights','phone','lat','lng','added_by','owner_name','website','source_id'];
+const COLS = ['name','sport','sports','city','country','surface','price','lights','phone','lat','lng','added_by','owner_name','website','address','postal_code','source_id'];
 const UPDATABLE_COLS = COLS.filter(c => c !== 'phone' && c !== 'source_id'); // never clobber a user-completed phone number
 
 const MIGRATION_SQL = `
@@ -127,6 +135,8 @@ const MIGRATION_SQL = `
   CREATE UNIQUE INDEX IF NOT EXISTS terrains_source_id_idx ON terrains (source_id) WHERE source_id IS NOT NULL;
   ALTER TABLE terrains ADD COLUMN IF NOT EXISTS owner_name TEXT;
   ALTER TABLE terrains ADD COLUMN IF NOT EXISTS website TEXT;
+  ALTER TABLE terrains ADD COLUMN IF NOT EXISTS address TEXT;
+  ALTER TABLE terrains ADD COLUMN IF NOT EXISTS postal_code TEXT;
 `;
 
 function buildInsertSQL(rows) {
@@ -261,9 +271,12 @@ async function runAllDepartments() {
 
   const totals = { fetched: 0, parseErrors: 0, skipped: 0, inserted: 0, updated: 0, duplicates: 0 };
   const failed = [];
+  const reconciliation = []; // { key, apiCount, fetched, matched } for departments processed THIS run
+  let apiTotalAllDepts = 0;
 
   for (const { code, count } of depts) {
     const key = code === null ? '__sans_departement__' : code;
+    apiTotalAllDepts += count;
     if (done.has(key)) { console.log(`[import] ${key} déjà traité, ignoré`); continue; }
 
     console.log(`[import] ${key} (${count} équipements dans la source)…`);
@@ -271,6 +284,7 @@ async function runAllDepartments() {
       const stats = await withRetry(`département ${key}`, () => importDepartment(code));
       addStats(totals, stats);
       console.log(`[import]   → ${stats.inserted} insérés, ${stats.updated} mis à jour, ${stats.duplicates} déjà à jour, ${stats.skipped} ignorés`);
+      reconciliation.push({ key, apiCount: count, fetched: stats.fetched, matched: stats.inserted + stats.updated + stats.duplicates });
 
       if (!dryRun) {
         done.add(key);
@@ -280,12 +294,32 @@ async function runAllDepartments() {
     } catch (err) {
       console.error(`[import]   ✗ ${key} abandonné après ${RETRY_ATTEMPTS} tentatives: ${err.message}`);
       failed.push(key);
+      reconciliation.push({ key, apiCount: count, fetched: 0, matched: 0 });
     }
   }
 
   if (failed.length) {
     console.log(`[import] ${failed.length} groupe(s) en échec, relancez la même commande pour reprendre uniquement ceux-ci: ${failed.join(', ')}`);
   }
+
+  console.log('\n[import] réconciliation — départements traités lors de cette exécution :');
+  console.log('  (source vs lus : doit être égal, sinon le flux réseau a été tronqué — voir ⚠. lus vs en base : un écart est normal, ce sont des équipements sans coordonnées GPS, filtrés par le script.)');
+  let anyMismatch = false;
+  for (const r of reconciliation) {
+    const mismatch = r.apiCount !== r.fetched;
+    if (mismatch) anyMismatch = true;
+    console.log(`  ${mismatch ? '⚠' : '✓'} ${r.key}: source=${r.apiCount}, lus=${r.fetched}, en base après import=${r.matched}${mismatch ? `  (écart lecture ${r.fetched - r.apiCount})` : ''}`);
+  }
+  if (!anyMismatch && reconciliation.length) console.log('  aucun écart source/lecture sur les départements traités cette fois.');
+
+  if (!dryRun) {
+    const { rows: [{ n }] } = await pool.query("SELECT count(*)::int AS n FROM terrains WHERE source_id LIKE 'gouv:%'");
+    console.log(`\n[import] réconciliation globale : source RES annonce ${apiTotalAllDepts} équipements (tous départements, y compris ceux déjà importés lors d'exécutions précédentes) ; en base (source_id gouv:*) : ${n}.`);
+    if (n !== apiTotalAllDepts) {
+      console.log(`  écart global : ${n - apiTotalAllDepts} — normal si des départements restent en échec/pas encore traités (voir la liste ci-dessus et le fichier de progression), ou si des équipements source manquent de coordonnées GPS (filtrés par le script, pas affichables sur une carte).`);
+    }
+  }
+
   return totals;
 }
 
@@ -295,7 +329,7 @@ async function main() {
 
   if (!dryRun) {
     await pool.query(MIGRATION_SQL);
-    console.log('[import] colonnes source_id/owner_name/website prêtes');
+    console.log('[import] colonnes source_id/owner_name/website/address/postal_code prêtes');
   }
 
   const totals = dep ? await runSingleDepartment() : await runAllDepartments();

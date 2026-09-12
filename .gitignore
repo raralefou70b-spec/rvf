@@ -36,3 +36,4 @@ yarn-error.log*
 
 # Testing
 /rvf/coverage/
+node_modules/

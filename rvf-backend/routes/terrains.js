@@ -1,6 +1,6 @@
 const router = require('express').Router();
 const { pool } = require('../db');
-const { optionalAuth, requireAdmin } = require('../middleware/auth');
+const { optionalAuth, requireAuth, requireAdmin } = require('../middleware/auth');
 
 // Maps a DB row to the object shape the React app expects.
 // Handles both the old Express schema (fee, is_seeded) and the Supabase schema (free).
@@ -23,6 +23,8 @@ function rowToTerrain(r) {
     phone:     r.phone,
     ownerName: r.owner_name || null,
     website:   r.website || null,
+    address:    r.address || null,
+    postalCode: r.postal_code || null,
     addedBy:   r.added_by,
     verified:  r.verified !== false,
     createdAt: r.created_at,
@@ -37,8 +39,13 @@ router.get('/', optionalAuth, async (req, res) => {
   try {
     const { bbox, zoom } = req.query;
     if (!bbox) {
-      const { rows } = await pool.query('SELECT * FROM terrains ORDER BY created_at ASC');
-      return res.json({ mode: 'terrains', terrains: rows.map(rowToTerrain) });
+      const limit  = Math.min(2000, Math.max(1, parseInt(req.query.limit, 10)  || 1000));
+      const offset = Math.max(0, parseInt(req.query.offset, 10) || 0);
+      const [{ rows }, { rows: [{ count }] }] = await Promise.all([
+        pool.query('SELECT * FROM terrains ORDER BY created_at ASC LIMIT $1 OFFSET $2', [limit, offset]),
+        pool.query('SELECT count(*)::int AS count FROM terrains'),
+      ]);
+      return res.json({ mode: 'terrains', terrains: rows.map(rowToTerrain), total: count, limit, offset });
     }
 
     const parts = String(bbox).split(',').map(Number);
@@ -141,7 +148,7 @@ router.delete('/:id', requireAdmin, async (req, res) => {
 });
 
 // PUT /api/terrains/:id/phone
-router.put('/:id/phone', optionalAuth, async (req, res) => {
+router.put('/:id/phone', requireAuth, async (req, res) => {
   const { id } = req.params;
   const { phone } = req.body;
   try {

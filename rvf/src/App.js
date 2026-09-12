@@ -1419,17 +1419,21 @@ function AddTerrainModal({ user, onAdd, onClose, initialLat, initialLng, terrain
 
 // ─── INTERACTIVE MAP ──────────────────────────────────────────────────────────
 function InteractiveMap({ terrains, clusters, onSelect, userPos, onMapClick, pinPos, onMapReady, onViewportChange }) {
-  const {t: tr} = useTranslation();
+  const {t: tr, i18n} = useTranslation();
   const wrapRef      = useRef(null);
   const mapRef       = useRef(null);
   const clusterGroupRef = useRef(null);
   const clusterDotsRef  = useRef([]);
+  const iconCacheRef    = useRef(new Map());
   const userDotRef   = useRef(null);
   const pinMarkerRef = useRef(null);
   const onMapClickRef = useRef(onMapClick);
   useEffect(() => { onMapClickRef.current = onMapClick; }, [onMapClick]);
   const onViewportChangeRef = useRef(onViewportChange);
   useEffect(() => { onViewportChangeRef.current = onViewportChange; }, [onViewportChange]);
+  // Defensive: nothing language-dependent in the icon HTML today (color + emoji/SVG only),
+  // but clear the cache if that ever changes so a stale label can't linger.
+  useEffect(() => { iconCacheRef.current.clear(); }, [i18n.language]);
 
   // Init map once
   useEffect(() => {
@@ -1524,20 +1528,23 @@ function InteractiveMap({ terrains, clusters, onSelect, userPos, onMapClick, pin
       if (!t.lat || !t.lng) return;
       const tSports = terrainSports(t).map(id=>SPORTS.find(s=>s.id===id)).filter(Boolean);
       const sp    = tSports[0];
-      const color = sp?.color || C.accent;
-      const innerContent = sp?.id === "padel"
-        ? `<svg width="15" height="15" viewBox="0 0 20 20"><rect x="2.5" y="1" width="15" height="12" rx="4" fill="none" stroke="#06090f" stroke-width="1.7"/><circle cx="7" cy="5.5" r="1.1" fill="#06090f"/><circle cx="10" cy="5.5" r="1.1" fill="#06090f"/><circle cx="13" cy="5.5" r="1.1" fill="#06090f"/><circle cx="7" cy="9" r="1.1" fill="#06090f"/><circle cx="10" cy="9" r="1.1" fill="#06090f"/><circle cx="13" cy="9" r="1.1" fill="#06090f"/><rect x="8.8" y="13" width="2.4" height="6" rx="1.2" fill="#06090f"/></svg>`
-        : `<span style="font-size:14px">${sp?.emoji || "🏟️"}</span>`;
-      const multiSportBadge = tSports.length>1
-        ? `<span style="font-size:10px;background:rgba(0,229,160,.15);color:#00e5a0;border-radius:4px;padding:1px 5px;font-weight:700">+${tSports.length-1}</span>`
-        : "";
-      const icon  = L.divIcon({
-        html: `<div style="position:relative;width:32px;height:32px;border-radius:50%;background:${color};border:3px solid #06090f;box-shadow:0 3px 10px rgba(0,0,0,.7);display:flex;align-items:center;justify-content:center;cursor:pointer">${innerContent}${tSports.length>1?`<span style="position:absolute;top:-4px;right:-4px;background:#00e5a0;color:#06090f;border-radius:50%;width:14px;height:14px;font-size:8px;font-weight:800;display:flex;align-items:center;justify-content:center;border:2px solid #06090f">${tSports.length}</span>`:""}</div>`,
-        iconSize:[32,32], iconAnchor:[16,16], className:"",
-      });
-      const sportsLine = tSports.map(s=>s.emoji+" "+s.label).join(" · ");
+      const cacheKey = `${sp?.id || 'default'}:${tSports.length}`;
+      let icon = iconCacheRef.current.get(cacheKey);
+      if (!icon) {
+        const color = tSports.length > 1 ? C.accent : (sp?.color || C.accent);
+        const innerContent = sp?.id === "padel"
+          ? `<svg width="15" height="15" viewBox="0 0 20 20"><rect x="2.5" y="1" width="15" height="12" rx="4" fill="none" stroke="#06090f" stroke-width="1.7"/><circle cx="7" cy="5.5" r="1.1" fill="#06090f"/><circle cx="10" cy="5.5" r="1.1" fill="#06090f"/><circle cx="13" cy="5.5" r="1.1" fill="#06090f"/><circle cx="7" cy="9" r="1.1" fill="#06090f"/><circle cx="10" cy="9" r="1.1" fill="#06090f"/><circle cx="13" cy="9" r="1.1" fill="#06090f"/><rect x="8.8" y="13" width="2.4" height="6" rx="1.2" fill="#06090f"/></svg>`
+          : `<span style="font-size:14px">${sp?.emoji || "🏟️"}</span>`;
+        icon = L.divIcon({
+          html: `<div style="position:relative;width:32px;height:32px;border-radius:50%;background:${color};border:3px solid #06090f;box-shadow:0 3px 10px rgba(0,0,0,.7);display:flex;align-items:center;justify-content:center;cursor:pointer">${innerContent}${tSports.length>1?`<span style="position:absolute;top:-4px;right:-4px;background:#00e5a0;color:#06090f;border-radius:50%;width:14px;height:14px;font-size:8px;font-weight:800;display:flex;align-items:center;justify-content:center;border:2px solid #06090f">${tSports.length}</span>`:""}</div>`,
+          iconSize:[32,32], iconAnchor:[16,16], className:"",
+        });
+        iconCacheRef.current.set(cacheKey, icon);
+      }
       const marker = L.marker([t.lat, t.lng], { icon });
-      marker.bindPopup(`
+      marker.bindPopup(() => {
+        const sportsLine = tSports.map(s=>s.emoji+" "+s.label).join(" · ");
+        return `
         <div style="padding:12px 14px;min-width:190px">
           <div style="font-weight:700;font-size:14px;margin-bottom:5px">${t.name}</div>
           <div style="font-size:11px;color:#5c7080;margin-bottom:6px">📍 ${t.city}, ${t.country}</div>
@@ -1551,7 +1558,8 @@ function InteractiveMap({ terrains, clusters, onSelect, userPos, onMapClick, pin
             ${tr('map.see_terrain')}
           </button>
         </div>
-      `, { maxWidth:240, minWidth:200 });
+      `;
+      }, { maxWidth:240, minWidth:200 });
       marker.on("popupopen", () => {
         const btn = document.getElementById(`rvfbtn-${t.id}`);
         if (btn) btn.onclick = () => onSelect(t);
@@ -2628,36 +2636,49 @@ function TerrainDetail({ terrain, onBack, user, onUpdatePhone, onDelete }) {
             <Badge label={`👥 ${terrain.players}`} color={C.purple}/>
             {terrain.addedBy&&<Badge label={"+ "+terrain.addedBy} color={C.sub}/>}
           </div>
-          {terrain.phone ? (
-            phoneRevealed ? (
-              <a href={`tel:${terrain.phone.replace(/\s/g,"")}`}
-                style={{display:"inline-flex",alignItems:"center",gap:8,marginTop:12,background:`${C.accent}15`,border:`1px solid ${C.accent}55`,borderRadius:12,padding:"10px 18px",textDecoration:"none",cursor:"pointer",alignSelf:"flex-start"}}>
-                <span style={{fontSize:20}}>📞</span>
-                <div>
-                  <div style={{fontSize:10,color:C.accent,fontWeight:700,letterSpacing:.5}}>{t('terrain.call')}</div>
-                  <div style={{fontSize:13,color:C.text,fontWeight:700,fontFamily:"monospace",marginTop:1}}>{terrain.phone}</div>
-                </div>
-              </a>
+          <div style={{display:"flex",gap:10,flexWrap:"wrap"}}>
+            {terrain.phone ? (
+              phoneRevealed ? (
+                <a href={`tel:${terrain.phone.replace(/\s/g,"")}`}
+                  style={{display:"inline-flex",alignItems:"center",gap:8,marginTop:12,background:`${C.accent}15`,border:`1px solid ${C.accent}55`,borderRadius:12,padding:"10px 18px",textDecoration:"none",cursor:"pointer",alignSelf:"flex-start"}}>
+                  <span style={{fontSize:20}}>📞</span>
+                  <div>
+                    <div style={{fontSize:10,color:C.accent,fontWeight:700,letterSpacing:.5}}>{t('terrain.call')}</div>
+                    <div style={{fontSize:13,color:C.text,fontWeight:700,fontFamily:"monospace",marginTop:1}}>{terrain.phone}</div>
+                  </div>
+                </a>
+              ) : (
+                <button onClick={()=>setShowPhoneModal(true)}
+                  style={{display:"inline-flex",alignItems:"center",gap:8,marginTop:12,background:`${C.accent}15`,border:`1px solid ${C.accent}55`,borderRadius:12,padding:"10px 18px",cursor:"pointer",alignSelf:"flex-start",fontFamily:C.font}}>
+                  <span style={{fontSize:20}}>📞</span>
+                  <div style={{textAlign:"left"}}>
+                    <div style={{fontSize:10,color:C.accent,fontWeight:700,letterSpacing:.5}}>{t('terrain.call')}</div>
+                    <div style={{fontSize:11,color:C.sub,marginTop:1}}>{t('terrain.call_hint')}</div>
+                  </div>
+                </button>
+              )
             ) : (
-              <button onClick={()=>setShowPhoneModal(true)}
-                style={{display:"inline-flex",alignItems:"center",gap:8,marginTop:12,background:`${C.accent}15`,border:`1px solid ${C.accent}55`,borderRadius:12,padding:"10px 18px",cursor:"pointer",alignSelf:"flex-start",fontFamily:C.font}}>
+              <button onClick={()=>{setAddPhoneVal("");setShowAddPhone(true);}}
+                style={{display:"inline-flex",alignItems:"center",gap:8,marginTop:12,background:C.card2,border:`1px dashed ${C.border}`,borderRadius:12,padding:"10px 18px",cursor:"pointer",alignSelf:"flex-start",fontFamily:C.font}}>
                 <span style={{fontSize:20}}>📞</span>
                 <div style={{textAlign:"left"}}>
-                  <div style={{fontSize:10,color:C.accent,fontWeight:700,letterSpacing:.5}}>{t('terrain.call')}</div>
-                  <div style={{fontSize:11,color:C.sub,marginTop:1}}>{t('terrain.call_hint')}</div>
+                  <div style={{fontSize:10,color:C.sub,fontWeight:700,letterSpacing:.5}}>{t('terrain.phone_missing')}</div>
+                  <div style={{fontSize:11,color:C.accent,marginTop:1,fontWeight:600}}>{t('terrain.phone_add')}</div>
                 </div>
               </button>
-            )
-          ) : (
-            <button onClick={()=>{setAddPhoneVal("");setShowAddPhone(true);}}
-              style={{display:"inline-flex",alignItems:"center",gap:8,marginTop:12,background:C.card2,border:`1px dashed ${C.border}`,borderRadius:12,padding:"10px 18px",cursor:"pointer",alignSelf:"flex-start",fontFamily:C.font}}>
-              <span style={{fontSize:20}}>📞</span>
-              <div style={{textAlign:"left"}}>
-                <div style={{fontSize:10,color:C.sub,fontWeight:700,letterSpacing:.5}}>{t('terrain.phone_missing')}</div>
-                <div style={{fontSize:11,color:C.accent,marginTop:1,fontWeight:600}}>{t('terrain.phone_add')}</div>
-              </div>
-            </button>
-          )}
+            )}
+            {terrain.lat && terrain.lng && (
+              <a href={`http://maps.apple.com/?daddr=${terrain.lat},${terrain.lng}&q=${encodeURIComponent(terrain.name)}`}
+                target="_blank" rel="noopener noreferrer"
+                style={{display:"inline-flex",alignItems:"center",gap:8,marginTop:12,background:C.card2,border:`1px solid ${C.border}`,borderRadius:12,padding:"10px 18px",textDecoration:"none",cursor:"pointer",alignSelf:"flex-start"}}>
+                <span style={{fontSize:20}}>🧭</span>
+                <div>
+                  <div style={{fontSize:10,color:C.text,fontWeight:700,letterSpacing:.5}}>{t('terrain.directions')}</div>
+                  <div style={{fontSize:11,color:C.sub,marginTop:1}}>{t('terrain.directions_hint')}</div>
+                </div>
+              </a>
+            )}
+          </div>
         </div>
 
         {/* Tabs */}
@@ -2680,7 +2701,7 @@ function TerrainDetail({ terrain, onBack, user, onUpdatePhone, onDelete }) {
           {tab==="photos"    && <PhotosTab terrain={terrain} user={user} sp={sp}/>}
           {tab==="info"      && (
             <div style={{background:C.card,border:`1px solid ${C.border}`,borderRadius:14,padding:14}}>
-              {[["🏟️ "+t('terrain.surface'),t('surfaces.'+(SURF_KEYS[terrain.surface]||'gazon_naturel'))],["💡 "+t('terrain.lighting'),terrain.lights?t('terrain.available'):t('terrain.unavailable')],["💰 "+t('terrain.price_label'),terrain.price],["⭐ "+t('terrain.rating'),terrain.rating>0?terrain.rating+"/5":t('terrain.unrated')],["👥 "+t('terrain.players'),terrain.players],...(terrain.phone?[["📞 "+t('terrain.phone_label'),terrain.phone]]:[]),...(terrain.ownerName?[["🏢 "+t('terrain.owner_label'),terrain.ownerName]]:[]),...(terrain.website?[["🔗 "+t('terrain.website_label'),<a href={terrain.website} target="_blank" rel="noopener noreferrer" style={{color:C.accent,textDecoration:"none"}}>{terrain.website.replace(/^https?:\/\//,"")}</a>]]:[])] .map(([k,v])=>(
+              {[["🏟️ "+t('terrain.surface'),t('surfaces.'+(SURF_KEYS[terrain.surface]||'gazon_naturel'))],["💡 "+t('terrain.lighting'),terrain.lights?t('terrain.available'):t('terrain.unavailable')],["💰 "+t('terrain.price_label'),terrain.price],["⭐ "+t('terrain.rating'),terrain.rating>0?terrain.rating+"/5":t('terrain.unrated')],["👥 "+t('terrain.players'),terrain.players],...(terrain.phone?[["📞 "+t('terrain.phone_label'),terrain.phone]]:[]),...(terrain.address?[["📮 "+t('terrain.address_label'),[terrain.address,terrain.postalCode,terrain.city].filter(Boolean).join(', ')]]:[]),...(terrain.ownerName?[["🏢 "+t('terrain.owner_label'),terrain.ownerName]]:[]),...(terrain.website?[["🔗 "+t('terrain.website_label'),<a href={terrain.website} target="_blank" rel="noopener noreferrer" style={{color:C.accent,textDecoration:"none"}}>{terrain.website.replace(/^https?:\/\//,"")}</a>]]:[])] .map(([k,v])=>(
                 <div key={k} style={{display:"flex",justifyContent:"space-between",padding:"8px 0",borderBottom:`1px solid ${C.border}`}}>
                   <span style={{color:C.sub,fontSize:13}}>{k}</span>
                   <span style={{color:C.text,fontSize:13,fontWeight:600}}>{v}</span>
@@ -5741,6 +5762,7 @@ export default function App() {
   const [user,setUser]         = useState(null);
   const [view,setView]         = useState("map");
   const [selTerrain,setTerrain] = useState(null);
+  const handleSelectTerrain = useCallback(t => { setTerrain(t); setView("terrain"); }, []);
   const [terrains,setTerrains] = useState([]);
   const [clusters,setClusters] = useState([]);
   const terrainsCacheRef = useRef(new Map());
@@ -5797,10 +5819,13 @@ export default function App() {
   // Load terrains for the map's current viewport (bbox+zoom), cached by rounded bbox+zoom.
   // zoom < 12 -> lightweight cluster dots; zoom >= 12 -> individual terrains.
   const loadTerrainsForViewport = useCallback(({ bbox, zoom }) => {
-    const precision = zoom < 6 ? 0 : zoom < 10 ? 1 : 2;
+    const precision = zoom < 6 ? 0 : zoom < 10 ? 1 : zoom < 14 ? 2 : zoom < 17 ? 3 : zoom < 20 ? 4 : 5;
     const f = 10 ** precision;
     const round = n => Math.round(n * f) / f;
     const rBbox = bbox.map(round);
+    // Filet de sécurité : ne jamais envoyer une bbox nulle même si l'arrondi dégénère
+    if (rBbox[0] >= rBbox[2]) { rBbox[0] -= 10**-precision; rBbox[2] += 10**-precision; }
+    if (rBbox[1] >= rBbox[3]) { rBbox[1] -= 10**-precision; rBbox[3] += 10**-precision; }
     const cacheKey = `${zoom}:${rBbox.join(',')}`;
 
     const applyResult = d => {
@@ -6066,7 +6091,7 @@ useEffect(()=>{
         {screen==="register" && <RegisterScreen onSuccess={doRegister} goBack={()=>setScreen("landing")}/>}
         {screen==="welcome"  && <WelcomeScreen user={user} onEnter={()=>setScreen("app")}/>}
 
-        {screen==="app" && view==="map"      && !selTerrain && <MapView onSelect={t=>{setTerrain(t);setView("terrain");}} terrains={terrains} clusters={clusters} onViewportChange={loadTerrainsForViewport} user={user} onAddTerrain={addTerrain} userPos={userPos} gpsError={gpsError} gpsLoading={gpsLoading} onRequestGps={requestGps}/>}
+        {screen==="app" && view==="map"      && !selTerrain && <MapView onSelect={handleSelectTerrain} terrains={terrains} clusters={clusters} onViewportChange={loadTerrainsForViewport} user={user} onAddTerrain={addTerrain} userPos={userPos} gpsError={gpsError} gpsLoading={gpsLoading} onRequestGps={requestGps}/>}
         {screen==="app" && view==="terrain"  && selTerrain  && <div style={{flex:1,overflowY:"auto"}}><TerrainDetail terrain={selTerrain} onBack={()=>{setView("map");setTerrain(null);}} user={user} onUpdatePhone={updateTerrainPhone} onDelete={deleteTerrain}/></div>}
         {screen==="app" && view==="teams"    && <TeamsView user={user} terrains={terrains} onGoToMessages={goToMessages}/>}
         {screen==="app" && view==="messages" && <MessagingView user={user} openWith={openMsgWith}/>}
