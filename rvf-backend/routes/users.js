@@ -24,4 +24,27 @@ router.get('/', requireAuth, async (req, res) => {
   }
 });
 
+// GET /api/users/me/badges — real, server-computed progress for the logged-in user.
+// Only covers insignia that are actually traceable in the DB today:
+//   - builder: terrains.added_by_user_id (added when a terrain is created via this API)
+//   - recruiter: users.referral_count
+// "explorer" (cities visited) and "competitor" (matches played) have no visit or match
+// log anywhere in the schema, so they are intentionally NOT included here rather than
+// faked with a made-up number.
+router.get('/me/badges', requireAuth, async (req, res) => {
+  try {
+    const [{ rows: [{ n }] }, { rows: [u] }] = await Promise.all([
+      pool.query('SELECT count(*)::int AS n FROM terrains WHERE added_by_user_id = $1', [req.user.id]),
+      pool.query('SELECT referral_count FROM users WHERE id = $1', [req.user.id]),
+    ]);
+    res.json({
+      builder: n,
+      recruiter: u?.referral_count || 0,
+    });
+  } catch (e) {
+    console.error('GET /api/users/me/badges', e);
+    res.status(500).json({ error: 'server_error' });
+  }
+});
+
 module.exports = router;

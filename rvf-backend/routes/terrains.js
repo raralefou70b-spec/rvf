@@ -102,8 +102,8 @@ router.post('/', optionalAuth, async (req, res) => {
     // Insert without id — let the DB sequence generate a bigint automatically
     const { rows } = await pool.query(
       `INSERT INTO terrains
-         (name, sport, sports, city, country, surface, price, lights, free, phone, lat, lng, added_by, photos)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14)
+         (name, sport, sports, city, country, surface, price, lights, free, phone, lat, lng, added_by, added_by_user_id, photos)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15)
        RETURNING *`,
       [
         name,
@@ -119,6 +119,7 @@ router.post('/', optionalAuth, async (req, res) => {
         lat     || null,
         lng     || null,
         resolvedAddedBy,
+        req.user?.id || null,
         photos  || [],
       ]
     );

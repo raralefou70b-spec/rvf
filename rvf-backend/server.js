@@ -33,6 +33,7 @@ app.use('/api/admin',   require('./routes/admin'));
 app.use('/api/teams',   require('./routes/teams'));
 app.use('/api/messages',require('./routes/messages'));
 app.use('/api/users',   require('./routes/users'));
+app.use('/api/friends', require('./routes/friends'));
 // Public maintenance status (no auth required)
 app.get('/api/maintenance', async (_, res) => {
   try {

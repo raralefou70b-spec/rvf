@@ -70,6 +70,28 @@ router.get('/', optionalAuth, async (req, res) => {
   }
 });
 
+// GET /api/teams/mine — teams the logged-in user is an approved member of (captain or not),
+// used to populate the team-chat list in Messages.
+router.get('/mine', requireAuth, async (req, res) => {
+  try {
+    const { rows } = await pool.query(`
+      SELECT t.*, m.role AS my_role,
+        (SELECT count(*) FROM team_members m2 WHERE m2.team_id = t.id AND m2.status = 'approved') AS member_count
+      FROM teams t
+      JOIN team_members m ON m.team_id = t.id AND m.user_id = $1 AND m.status = 'approved'
+      ORDER BY t.name ASC
+    `, [req.user.id]);
+    res.json(rows.map(r => rowToTeam({
+      ...r,
+      is_member: true,
+      is_captain: r.owner_id === req.user.id || r.my_role === 'captain',
+    })));
+  } catch (e) {
+    console.error('GET /api/teams/mine', e);
+    res.status(500).json({ error: 'server_error' });
+  }
+});
+
 // POST /api/teams/:id/join
 router.post('/:id/join', requireAuth, async (req, res) => {
   try {
@@ -92,18 +114,7 @@ router.post('/:id/join', requireAuth, async (req, res) => {
   }
 });
 
-// True if userId owns teamId or holds an approved 'captain' membership on it.
-async function isTeamCaptain(userId, teamId) {
-  const { rows } = await pool.query(
-    `SELECT 1 FROM teams WHERE id = $1 AND owner_id = $2
-     UNION
-     SELECT 1 FROM team_members WHERE team_id = $1 AND user_id = $2 AND role = 'captain' AND status = 'approved'`,
-    [teamId, userId]
-  );
-  return rows.length > 0;
-}
-
-// GET /api/teams/:id/members — approved roster; a captain also sees pending invitations
+// GET /api/teams/:id/members — approved roster; a fellow approved member also sees pending invitations
 router.get('/:id/members', optionalAuth, async (req, res) => {
   const teamId = req.params.id;
   try {
@@ -119,7 +130,7 @@ router.get('/:id/members', optionalAuth, async (req, res) => {
     );
 
     let pendingInvites = [];
-    if (req.user?.id && await isTeamCaptain(req.user.id, teamId)) {
+    if (req.user?.id && await isTeamMember(req.user.id, teamId)) {
       const { rows } = await pool.query(
         `SELECT tm.id, tm.user_id, u.name, u.city, tm.created_at
          FROM team_members tm JOIN users u ON u.id = tm.user_id
@@ -137,7 +148,7 @@ router.get('/:id/members', optionalAuth, async (req, res) => {
   }
 });
 
-// POST /api/teams/:id/invite — captain invites a user by id (pending team_members row)
+// POST /api/teams/:id/invite — any approved member invites a user by id (pending team_members row)
 router.post('/:id/invite', requireAuth, async (req, res) => {
   const teamId = req.params.id;
   const targetUserId = parseInt(req.body.userId, 10);
@@ -149,7 +160,7 @@ router.post('/:id/invite', requireAuth, async (req, res) => {
     const team = teamRows[0];
     if (!team) return res.status(404).json({ error: 'team_not_found' });
     if (team.is_demo) return res.status(403).json({ error: 'demo_team' });
-    if (!(await isTeamCaptain(req.user.id, teamId))) return res.status(403).json({ error: 'not_captain' });
+    if (!(await isTeamMember(req.user.id, teamId))) return res.status(403).json({ error: 'not_a_member' });
 
     const { rows: userRows } = await pool.query('SELECT id FROM users WHERE id = $1', [targetUserId]);
     if (!userRows[0]) return res.status(404).json({ error: 'user_not_found' });

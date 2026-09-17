@@ -370,6 +370,8 @@ const resources = {
       already_member:"Déjà membre", already_invited:"Déjà invité(e)", invite_error:"Impossible d'inviter ce joueur",
       my_invitations:"📨 Invitations reçues", accept_invite:"Accepter", decline_invite:"Refuser",
       invite_pending_label:"En attente",
+      my_friends_label:"👫 Mes amis", search_other_label:"Ou par pseudo",
+      team_members_label:"👥 Membres de l'équipe", no_friends_hint:"Aucun ami pour l'instant.",
     },
     messages: {
       title:"Messages",
@@ -886,6 +888,8 @@ const resources = {
       already_member:"Already a member", already_invited:"Already invited", invite_error:"Couldn't invite this player",
       my_invitations:"📨 Invitations received", accept_invite:"Accept", decline_invite:"Decline",
       invite_pending_label:"Pending",
+      my_friends_label:"👫 My friends", search_other_label:"Or by username",
+      team_members_label:"👥 Team members", no_friends_hint:"No friends yet.",
     },
     messages: {
       title:"Messages",
@@ -1387,6 +1391,8 @@ const resources = {
       already_member:"Ya es miembro", already_invited:"Ya invitado(a)", invite_error:"No se pudo invitar a este jugador",
       my_invitations:"📨 Invitaciones recibidas", accept_invite:"Aceptar", decline_invite:"Rechazar",
       invite_pending_label:"Pendiente",
+      my_friends_label:"👫 Mis amigos", search_other_label:"O por usuario",
+      team_members_label:"👥 Miembros del equipo", no_friends_hint:"Aún no tienes amigos.",
     },
     messages: {
       title:"Mensajes",
@@ -1765,6 +1771,8 @@ const resources = {
       already_member:"Já é membro", already_invited:"Já convidado(a)", invite_error:"Não foi possível convidar este jogador",
       my_invitations:"📨 Convites recebidos", accept_invite:"Aceitar", decline_invite:"Recusar",
       invite_pending_label:"Pendente",
+      my_friends_label:"👫 Meus amigos", search_other_label:"Ou por usuário",
+      team_members_label:"👥 Membros da equipe", no_friends_hint:"Ainda sem amigos.",
     },
     messages: {
       title:"Mensagens", new_message:"✉️ Novo", search:"Buscar jogador…",
@@ -2132,6 +2140,8 @@ const resources = {
       already_member:"عضو بالفعل", already_invited:"تمت دعوته بالفعل", invite_error:"تعذّرت دعوة هذا اللاعب",
       my_invitations:"📨 الدعوات المستلمة", accept_invite:"قبول", decline_invite:"رفض",
       invite_pending_label:"قيد الانتظار",
+      my_friends_label:"👫 أصدقائي", search_other_label:"أو حسب اسم المستخدم",
+      team_members_label:"👥 أعضاء الفريق", no_friends_hint:"لا يوجد أصدقاء بعد.",
     },
     messages: {
       title:"رسائل", new_message:"✉️ جديد", search:"البحث عن لاعب...",
@@ -2499,6 +2509,8 @@ const resources = {
       already_member:"已是成员", already_invited:"已邀请", invite_error:"无法邀请该玩家",
       my_invitations:"📨 收到的邀请", accept_invite:"接受", decline_invite:"拒绝",
       invite_pending_label:"待处理",
+      my_friends_label:"👫 我的好友", search_other_label:"或按用户名",
+      team_members_label:"👥 队伍成员", no_friends_hint:"暂无好友。",
     },
     messages: {
       title:"消息", new_message:"✉️ 新建", search:"搜索球员...",
@@ -2866,6 +2878,8 @@ const resources = {
       already_member:"पहले से सदस्य", already_invited:"पहले से आमंत्रित", invite_error:"इस खिलाड़ी को आमंत्रित नहीं किया जा सका",
       my_invitations:"📨 प्राप्त आमंत्रण", accept_invite:"स्वीकार करें", decline_invite:"अस्वीकार करें",
       invite_pending_label:"लंबित",
+      my_friends_label:"👫 मेरे मित्र", search_other_label:"या उपयोगकर्ता नाम से",
+      team_members_label:"👥 टीम के सदस्य", no_friends_hint:"अभी कोई मित्र नहीं।",
     },
     messages: {
       title:"संदेश", new_message:"✉️ नया", search:"खिलाड़ी खोजें...",
@@ -3233,6 +3247,8 @@ const resources = {
       already_member:"Bereits Mitglied", already_invited:"Bereits eingeladen", invite_error:"Dieser Spieler konnte nicht eingeladen werden",
       my_invitations:"📨 Erhaltene Einladungen", accept_invite:"Annehmen", decline_invite:"Ablehnen",
       invite_pending_label:"Ausstehend",
+      my_friends_label:"👫 Meine Freunde", search_other_label:"Oder nach Benutzername",
+      team_members_label:"👥 Teammitglieder", no_friends_hint:"Noch keine Freunde.",
     },
     messages: {
       title:"Nachrichten", new_message:"✉️ Neu", search:"Spieler suchen…",
@@ -3600,6 +3616,8 @@ const resources = {
       already_member:"Già membro", already_invited:"Già invitato/a", invite_error:"Impossibile invitare questo giocatore",
       my_invitations:"📨 Inviti ricevuti", accept_invite:"Accetta", decline_invite:"Rifiuta",
       invite_pending_label:"In sospeso",
+      my_friends_label:"👫 I miei amici", search_other_label:"O per nome utente",
+      team_members_label:"👥 Membri della squadra", no_friends_hint:"Ancora nessun amico.",
     },
     messages: {
       title:"Messaggi", new_message:"✉️ Nuovo", search:"Cerca giocatore…",
@@ -3967,6 +3985,8 @@ const resources = {
       already_member:"Уже участник", already_invited:"Уже приглашён(а)", invite_error:"Не удалось пригласить этого игрока",
       my_invitations:"📨 Полученные приглашения", accept_invite:"Принять", decline_invite:"Отклонить",
       invite_pending_label:"В ожидании",
+      my_friends_label:"👫 Мои друзья", search_other_label:"Или по имени пользователя",
+      team_members_label:"👥 Участники команды", no_friends_hint:"Пока нет друзей.",
     },
     messages: {
       title:"Сообщения", new_message:"✉️ Новое", search:"Поиск игрока…",
@@ -4334,6 +4354,8 @@ const resources = {
       already_member:"すでにメンバーです", already_invited:"招待済みです", invite_error:"このプレイヤーを招待できませんでした",
       my_invitations:"📨 受け取った招待", accept_invite:"承認", decline_invite:"拒否",
       invite_pending_label:"保留中",
+      my_friends_label:"👫 友達", search_other_label:"またはユーザー名で",
+      team_members_label:"👥 チームメンバー", no_friends_hint:"まだ友達がいません。",
     },
     messages: {
       title:"メッセージ", new_message:"✉️ 新規", search:"プレーヤーを検索...",
@@ -4701,6 +4723,8 @@ const resources = {
       already_member:"이미 멤버입니다", already_invited:"이미 초대됨", invite_error:"이 플레이어를 초대할 수 없습니다",
       my_invitations:"📨 받은 초대", accept_invite:"수락", decline_invite:"거절",
       invite_pending_label:"대기 중",
+      my_friends_label:"👫 내 친구", search_other_label:"또는 사용자 이름으로",
+      team_members_label:"👥 팀 멤버", no_friends_hint:"아직 친구가 없습니다.",
     },
     messages: {
       title:"메시지", new_message:"✉️ 새 메시지", search:"선수 검색...",
