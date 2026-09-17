@@ -2802,12 +2802,67 @@ function TeamRosterModal({ team, onClose, currentUser, onGoToMessages }) {
   const sp = SPORTS.find(s=>s.id===team.sport);
   const seed    = ROSTER[team.id] || [];
   const newMembers = TEAM_REQ.list.filter(r=>r.teamId===team.id && r.status==="accepted");
-  const allMembers = [
+  const legacyMembers = [
     ...seed,
     ...newMembers
       .filter(r => !seed.find(m=>m.id===r.fromUserId))
       .map(r=>{ const u=DB.find(u=>u.id===r.fromUserId); return { id:r.fromUserId, name:r.fromName, city:u?.city||"", level:u?.level||"Amateur" }; }),
   ];
+
+  // Real roster, backed by team_members — teams created through the app now persist server-side.
+  // isCaptain comes straight from the API (team_members/owner_id for THIS team), never from
+  // the account's global role, so a plain 'user' who created the team gets full rights on it.
+  const isCaptain = !!team.isCaptain;
+  const [roster, setRoster] = useState({ members: [], pendingInvites: [] });
+  const [inviteQuery, setInviteQuery] = useState("");
+  const [inviteResults, setInviteResults] = useState([]);
+  const [inviteBusyId, setInviteBusyId] = useState(null);
+  const [inviteMsg, setInviteMsg] = useState("");
+
+  const fetchRoster = useCallback(() => {
+    fetch(`${API}/api/teams/${team.id}/members`, { headers: authHeader(), signal: AbortSignal.timeout(4000) })
+      .then(r => r.ok ? r.json() : null)
+      .then(d => { if (d) setRoster(d); })
+      .catch(() => {});
+  }, [team.id]);
+  useEffect(() => { fetchRoster(); }, [fetchRoster]);
+
+  useEffect(() => {
+    if (!isCaptain || inviteQuery.trim().length < 2) { setInviteResults([]); return; }
+    const controller = new AbortController();
+    const timer = setTimeout(() => {
+      fetch(`${API}/api/users?q=${encodeURIComponent(inviteQuery.trim())}`, { headers: authHeader(), signal: controller.signal })
+        .then(r => r.ok ? r.json() : [])
+        .then(setInviteResults)
+        .catch(() => {});
+    }, 300);
+    return () => { clearTimeout(timer); controller.abort(); };
+  }, [inviteQuery, isCaptain]);
+
+  const invitePlayer = async (u) => {
+    setInviteBusyId(u.id); setInviteMsg("");
+    try {
+      const res = await fetch(`${API}/api/teams/${team.id}/invite`, {
+        method: 'POST',
+        headers: { 'Content-Type':'application/json', ...authHeader() },
+        body: JSON.stringify({ userId: u.id }),
+      });
+      const d = await res.json().catch(()=>({}));
+      if (res.ok) {
+        setInviteQuery(""); setInviteResults([]); setInviteMsg(t('teams.invite_sent'));
+        fetchRoster();
+      } else {
+        setInviteMsg(d.error==='already_member' ? t('teams.already_member') : d.error==='already_invited' ? t('teams.already_invited') : t('teams.invite_error'));
+      }
+    } catch { setInviteMsg(t('teams.invite_error')); }
+    setInviteBusyId(null);
+  };
+
+  // Real members take priority; fall back to the legacy client-only roster (demo teams,
+  // or teams created before this account existed server-side) so nothing regresses to empty.
+  const allMembers = roster.members.length
+    ? roster.members.map(m => ({ id:m.user_id, name:m.name, city:m.city||"", level:"Amateur", captain:m.role==='captain' }))
+    : legacyMembers;
   return (
     <div style={{position:"fixed",inset:0,zIndex:999,background:"rgba(0,0,0,.85)",backdropFilter:"blur(6px)",display:"flex",alignItems:"center",justifyContent:"center",padding:16}} onClick={onClose}>
       <div style={{background:C.card,border:`1px solid ${C.border}`,borderRadius:20,width:"100%",maxWidth:440,maxHeight:"80vh",display:"flex",flexDirection:"column",boxShadow:"0 30px 80px rgba(0,0,0,.8)"}} onClick={e=>e.stopPropagation()}>
@@ -2821,6 +2876,40 @@ function TeamRosterModal({ team, onClose, currentUser, onGoToMessages }) {
           </div>
           <button onClick={onClose} style={{background:"none",border:"none",color:C.sub,fontSize:22,cursor:"pointer",lineHeight:1}}>×</button>
         </div>
+        {isCaptain && (
+          <div style={{padding:"12px 16px",borderBottom:`1px solid ${C.border}`,flexShrink:0}}>
+            <div style={{position:"relative",marginBottom:inviteResults.length||inviteMsg?8:0}}>
+              <input value={inviteQuery} onChange={e=>{setInviteQuery(e.target.value);setInviteMsg("");}}
+                placeholder={t('teams.invite_search_ph')}
+                style={{width:"100%",background:C.card2,border:`1px solid ${C.border}`,borderRadius:9,padding:"8px 12px 8px 30px",color:C.text,fontSize:12,outline:"none",fontFamily:C.font,boxSizing:"border-box"}}/>
+              <span style={{position:"absolute",left:9,top:"50%",transform:"translateY(-50%)",opacity:.4,fontSize:12}}>✉️</span>
+            </div>
+            {inviteResults.length>0 && (
+              <div style={{display:"flex",flexDirection:"column",gap:4,maxHeight:140,overflowY:"auto"}}>
+                {inviteResults.map(u=>(
+                  <div key={u.id} style={{display:"flex",alignItems:"center",gap:8,background:C.card2,borderRadius:8,padding:"6px 8px"}}>
+                    <Avatar name={u.name} size={26} color={C.accent}/>
+                    <div style={{flex:1,minWidth:0,fontSize:12,color:C.text,fontWeight:600,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{u.name}</div>
+                    <button onClick={()=>invitePlayer(u)} disabled={inviteBusyId===u.id}
+                      style={{padding:"4px 9px",borderRadius:7,background:`${C.accent}18`,border:`1px solid ${C.accent}44`,color:C.accent,fontSize:11,fontWeight:700,cursor:inviteBusyId===u.id?"default":"pointer",fontFamily:C.font,flexShrink:0}}>
+                      {inviteBusyId===u.id ? '…' : t('teams.invite_btn')}
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+            {inviteMsg && <div style={{fontSize:11,color:C.sub,marginTop:6}}>{inviteMsg}</div>}
+            {roster.pendingInvites.length>0 && (
+              <div style={{display:"flex",flexWrap:"wrap",gap:6,marginTop:10}}>
+                {roster.pendingInvites.map(p=>(
+                  <span key={p.id} style={{fontSize:10,color:C.sub,background:C.card2,border:`1px solid ${C.border}`,borderRadius:6,padding:"3px 8px"}}>
+                    {p.name} · {t('teams.invite_pending_label')}
+                  </span>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
         <div style={{flex:1,overflowY:"auto",padding:16,display:"flex",flexDirection:"column",gap:8}}>
           {allMembers.length===0
             ? <div style={{textAlign:"center",padding:32,color:C.sub,fontSize:13}}><div style={{fontSize:36,marginBottom:8}}>👥</div>{t('terrain.no_members')}</div>
@@ -3059,7 +3148,7 @@ function ChallengeModal({ user, myTeams, targetTeam, terrains, onClose }) {
   );
 }
 
-function TeamsView({ user, terrains, onGoToMessages }) {
+function TeamsView({ user, terrains, onGoToMessages, teams=[], refreshTeams }) {
   const {t} = useTranslation();
   useStore(TEAM_REQ);
   useStore(MATCH_REQ);
@@ -3068,7 +3157,6 @@ function TeamsView({ user, terrains, onGoToMessages }) {
   const [teamCity,setTeamCity]         = useState(user?.city||"");
   const [teamSport,setTeamSport]       = useState("football");
   const [teamLevel,setTeamLevel]       = useState("Amateur");
-  const [teams,setTeams]               = useState(TEAMS_DATA);
   const [filter,setFilter]             = useState("all");
   const [cityFilter,setCityFilter]     = useState("");
   const mySports = user?.sports?.length ? user.sports : null;
@@ -3080,7 +3168,7 @@ function TeamsView({ user, terrains, onGoToMessages }) {
   const [viewTab,setViewTab]           = useState("teams"); // "teams" | "matches" | "requests"
   const sp = id => SPORTS.find(s=>s.id===id);
 
-  const myTeams = teams.filter(t=>t.captainId===user?.id);
+  const myTeams = teams.filter(t=>t.isCaptain);
   const allPendingReqs = TEAM_REQ.reqsForCaptain(user?.id||"");
   const totalPending = allPendingReqs.length;
 
@@ -3096,11 +3184,43 @@ function TeamsView({ user, terrains, onGoToMessages }) {
   const incomingCount = incomingChallenges.length;
   const pastMatches = PAST_MATCHES.filter(m=>myTeamIds.includes(m.fromTeamId)||myTeamIds.includes(m.toTeamId));
 
-  const create = () => {
-    if (!teamName.trim()) return;
-    const t = { id:Date.now(), name:teamName, sport:teamSport, open:true, level:teamLevel, avatar:SPORTS.find(s=>s.id===teamSport)?.emoji, captainId:user?.id, city:teamCity.trim()||user?.city||"" };
-    ROSTER[t.id] = user ? [{ id:user.id, name:user.name, city:user.city||"", level:user.level||"Amateur", captain:true }] : [];
-    setTeams(p=>[...p, t]);
+  // Invitations received from other captains — backed by team_members (status='pending').
+  const [myInvites, setMyInvites] = useState([]);
+  const fetchMyInvites = useCallback(() => {
+    if (!user?.id) { setMyInvites([]); return; }
+    fetch(`${API}/api/teams/invitations`, { headers: authHeader(), signal: AbortSignal.timeout(4000) })
+      .then(r => r.ok ? r.json() : [])
+      .then(setMyInvites)
+      .catch(() => {});
+  }, [user?.id]);
+  useEffect(() => { fetchMyInvites(); }, [fetchMyInvites]);
+
+  const acceptInvite = async inv => {
+    try {
+      const res = await fetch(`${API}/api/teams/invitations/${inv.id}/accept`, { method:'POST', headers: authHeader() });
+      if (res.ok) { setMyInvites(p=>p.filter(i=>i.id!==inv.id)); refreshTeams?.(); }
+    } catch {}
+  };
+  const declineInvite = async inv => {
+    try {
+      const res = await fetch(`${API}/api/teams/invitations/${inv.id}/decline`, { method:'POST', headers: authHeader() });
+      if (res.ok) setMyInvites(p=>p.filter(i=>i.id!==inv.id));
+    } catch {}
+  };
+
+  const create = async () => {
+    if (!teamName.trim() || !user) return;
+    try {
+      const res = await fetch(`${API}/api/teams`, {
+        method: 'POST',
+        headers: { 'Content-Type':'application/json', ...authHeader() },
+        body: JSON.stringify({
+          name: teamName.trim(), sport: teamSport, city: teamCity.trim()||user?.city||"",
+          level: teamLevel, avatar: SPORTS.find(s=>s.id===teamSport)?.emoji,
+        }),
+      });
+      if (res.ok) refreshTeams?.();
+    } catch {}
     setTeamName(""); setTeamCity(user?.city||""); setShowCreate(false);
   };
 
@@ -3132,6 +3252,26 @@ function TeamsView({ user, terrains, onGoToMessages }) {
           </div>
           {viewTab==="teams" && <Btn onClick={()=>setShowCreate(p=>!p)} full={false} style={{padding:"9px 16px",fontSize:12}}>+ {t('common.create_btn')}</Btn>}
         </div>
+
+        {/* Invitations reçues d'un capitaine — visibles quel que soit l'onglet actif */}
+        {myInvites.length>0 && (
+          <div style={{display:"flex",flexDirection:"column",gap:10,marginBottom:16}}>
+            <div style={{fontSize:11,fontWeight:700,color:C.accent,textTransform:"uppercase",letterSpacing:1}}>{t('teams.my_invitations')}</div>
+            {myInvites.map(inv=>(
+              <div key={inv.id} style={{background:C.card,border:`1.5px solid ${C.accent}44`,borderRadius:14,padding:14,display:"flex",alignItems:"center",gap:12}}>
+                <div style={{width:38,height:38,borderRadius:10,background:`${C.accent}18`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:18,flexShrink:0}}>{inv.avatar||"👥"}</div>
+                <div style={{flex:1,minWidth:0}}>
+                  <div style={{fontSize:13,fontWeight:700,color:C.text}}>{inv.name}</div>
+                  {inv.city && <div style={{fontSize:11,color:C.sub,marginTop:1}}>📍 {inv.city}</div>}
+                </div>
+                <div style={{display:"flex",gap:6,flexShrink:0}}>
+                  <button onClick={()=>acceptInvite(inv)} style={{padding:"7px 12px",borderRadius:9,background:"rgba(81,207,102,.15)",border:"1px solid rgba(81,207,102,.4)",color:C.green,fontFamily:C.font,fontSize:12,fontWeight:700,cursor:"pointer"}}>✅ {t('teams.accept_invite')}</button>
+                  <button onClick={()=>declineInvite(inv)} style={{padding:"7px 12px",borderRadius:9,background:"rgba(255,107,107,.1)",border:"1px solid rgba(255,107,107,.3)",color:C.red,fontFamily:C.font,fontSize:12,fontWeight:700,cursor:"pointer"}}>❌ {t('teams.decline_invite')}</button>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
 
         {/* Tabs */}
         <div style={{display:"flex",background:C.card,borderRadius:12,padding:4,gap:4,marginBottom:16}}>
@@ -3195,10 +3335,11 @@ function TeamsView({ user, terrains, onGoToMessages }) {
             <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(280px,1fr))",gap:10}}>
               {filtered.map(team=>{
                 const s           = sp(team.sport);
-                const isCaptain   = user?.id === team.captainId;
+                const isCaptain   = !!team.isCaptain;
+                const isMember    = !!team.isMember;
                 const hasPending  = user && TEAM_REQ.userPending(user.id, team.id);
                 const accepted    = user && TEAM_REQ.userAccepted(user.id, team.id);
-                const memberCount = TEAM_REQ.teamMemberCount(team.id);
+                const memberCount = team.members;
                 const pendingCount = isCaptain ? TEAM_REQ.reqsForCaptain(user.id).filter(r=>r.teamId===team.id).length : 0;
                 const canChallenge = !isCaptain;
                 const alreadyChallenged = myTeams.some(mt=>MATCH_REQ.hasPending(mt.id,team.id)) || (user && MATCH_REQ.hasPendingSolo(user.id,team.id));
@@ -3223,7 +3364,7 @@ function TeamsView({ user, terrains, onGoToMessages }) {
                         <button onClick={()=>setRosterTeam(team)} style={{padding:"5px 10px",background:C.card2,border:`1px solid ${C.border}`,borderRadius:7,color:C.sub,fontSize:11,fontWeight:600,cursor:"pointer",fontFamily:C.font}}>
                           👥 {t('common.players')}
                         </button>
-                        {!isCaptain && (
+                        {!isMember && (
                           <button onClick={team.open&&!hasPending&&!accepted?()=>setJoinModal(team):undefined}
                             style={{padding:"5px 10px",background:accepted?`${C.green}18`:hasPending?`${C.yellow}15`:team.open?C.aLow:"transparent",border:`1px solid ${accepted?C.green+"44":hasPending?C.yellow+"44":team.open?C.accent+"44":C.border}`,borderRadius:7,color:accepted?C.green:hasPending?C.yellow:team.open?C.accent:C.sub,fontSize:11,fontWeight:600,cursor:team.open&&!hasPending&&!accepted?"pointer":"default",fontFamily:C.font}}>
                             {accepted?`✅ ${t('teams.member_badge')}`:hasPending?`⏳ ${t('common.pending')}`:team.open?t('teams.join'):t('teams.full_label')}
@@ -5845,13 +5986,15 @@ export default function App() {
       .then(d => { if (d) { terrainsCacheRef.current.set(cacheKey, d); applyResult(d); } })
       .catch(e => { if (e.name !== 'AbortError') console.warn('[RVF] terrains load error:', e.message); });
   }, []);
-    // Load teams from the Express backend
-useEffect(()=>{
-  fetch(`${API}/api/teams`, { signal: AbortSignal.timeout(5000) })
-    .then(r => r.ok ? r.json() : null)
-    .then(d => { if (d?.length) setTeams(d); })
-    .catch(() => {});
-},[]);
+  // Load teams from the Express backend — exposed so TeamsView can refresh after
+  // creating a team or accepting an invitation, without a full reload.
+  const fetchTeams = useCallback(() => {
+    fetch(`${API}/api/teams`, { signal: AbortSignal.timeout(5000) })
+      .then(r => r.ok ? r.json() : null)
+      .then(d => { if (d) setTeams(d); })
+      .catch(() => {});
+  }, []);
+  useEffect(() => { fetchTeams(); }, [fetchTeams]);
 
   // Maintenance banner (shown globally when active)
   useEffect(()=>{
@@ -6093,7 +6236,7 @@ useEffect(()=>{
 
         {screen==="app" && view==="map"      && !selTerrain && <MapView onSelect={handleSelectTerrain} terrains={terrains} clusters={clusters} onViewportChange={loadTerrainsForViewport} user={user} onAddTerrain={addTerrain} userPos={userPos} gpsError={gpsError} gpsLoading={gpsLoading} onRequestGps={requestGps}/>}
         {screen==="app" && view==="terrain"  && selTerrain  && <div style={{flex:1,overflowY:"auto"}}><TerrainDetail terrain={selTerrain} onBack={()=>{setView("map");setTerrain(null);}} user={user} onUpdatePhone={updateTerrainPhone} onDelete={deleteTerrain}/></div>}
-        {screen==="app" && view==="teams"    && <TeamsView user={user} terrains={terrains} onGoToMessages={goToMessages}/>}
+        {screen==="app" && view==="teams"    && <TeamsView user={user} terrains={terrains} onGoToMessages={goToMessages} teams={teams} refreshTeams={fetchTeams}/>}
         {screen==="app" && view==="messages" && <MessagingView user={user} openWith={openMsgWith}/>}
         {screen==="app" && view==="social"   && <SocialView user={user} terrains={terrains} onGoToMessages={goToMessages}/>}
         {screen==="app" && view==="profile"  && <ProfileView user={user} onLogout={doLogout} onUpdate={doUpdate} onGoSupport={()=>setView("support")} onGoAdmin={()=>setView("admin")} terrains={terrains}/>}
